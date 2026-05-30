@@ -1,0 +1,536 @@
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/role.php';
+
+// ==========================
+// 🔐 SESSION
+// ==========================
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// ==========================
+// 🔥 DB
+// ==========================
+$conn = $GLOBALS['conn'] ?? null;
+
+if (!$conn) {
+    die("❌ DB connection missing");
+}
+
+// ==========================
+// 🏢 BRANCH
+// ==========================
+$branch_id = (int)($_SESSION['branch_id'] ?? 1);
+
+// ==========================
+// 📦 ORDER ID
+// ==========================
+$order_id = (int)($_GET['id'] ?? 0);
+
+if ($order_id <= 0) {
+    die("❌ Invalid order ID");
+}
+
+// ==========================
+// 💰 RECEIVE PAYMENT
+// ==========================
+if (isset($_POST['receive_payment'])) {
+
+    $payment_method = trim(
+        $_POST['payment_method'] ?? 'cash'
+    );
+
+    $stmtPay = $conn->prepare("
+        UPDATE orders
+        SET
+            payment_method = ?,
+            payment_status = 'paid'
+        WHERE id = ?
+        AND branch_id = ?
+    ");
+
+    if ($stmtPay) {
+
+        $stmtPay->bind_param(
+            "sii",
+            $payment_method,
+            $order_id,
+            $branch_id
+        );
+
+        $stmtPay->execute();
+
+        $stmtPay->close();
+    }
+
+    header("Location: order_view.php?id=".$order_id);
+    exit;
+}
+
+// ==========================
+// 🚚 MARK DELIVERED
+// ==========================
+if (isset($_POST['mark_delivered'])) {
+
+    $stmtDelivered = $conn->prepare("
+        UPDATE orders
+        SET status = 'Delivered'
+        WHERE id = ?
+        AND branch_id = ?
+    ");
+
+    if ($stmtDelivered) {
+
+        $stmtDelivered->bind_param(
+            "ii",
+            $order_id,
+            $branch_id
+        );
+
+        $stmtDelivered->execute();
+
+        $stmtDelivered->close();
+    }
+
+    header("Location: order_view.php?id=".$order_id);
+    exit;
+}
+
+// ==========================
+// 📦 ORDER HEADER
+// ==========================
+$stmt = $conn->prepare("
+    SELECT *
+    FROM orders
+    WHERE id=?
+    AND branch_id=?
+");
+
+$stmt->bind_param(
+    "ii",
+    $order_id,
+    $branch_id
+);
+
+$stmt->execute();
+
+$order = $stmt->get_result()->fetch_assoc();
+
+if (!$order) {
+    die("❌ Order not found");
+}
+
+// ==========================
+// 🧾 ORDER ITEMS
+// ==========================
+$items = $conn->prepare("
+    SELECT oi.*, p.name, p.cost_price
+    FROM order_items oi
+    LEFT JOIN products p ON p.id = oi.product_id
+    WHERE oi.order_id=?
+");
+
+$items->bind_param("i", $order_id);
+
+$items->execute();
+
+$items = $items->get_result();
+
+// ==========================
+// 🚚 RIDER (OPTIONAL)
+// ==========================
+$rider = null;
+
+if (!empty($order['rider_id'])) {
+
+    $r = $conn->query("
+        SELECT *
+        FROM riders
+        WHERE id=".(int)$order['rider_id']
+    );
+
+    $rider = $r
+        ? $r->fetch_assoc()
+        : null;
+}
+
+// ==========================
+// 💰 CALCULATIONS
+// ==========================
+$total_cost = 0;
+$total_profit = 0;
+?>
+
+<style>
+
+.invoice-box{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    max-width:900px;
+    margin:auto;
+}
+
+.row{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:10px;
+}
+
+.badge{
+    padding:5px 10px;
+    border-radius:5px;
+    color:white;
+}
+
+.green{
+    background:green;
+}
+
+.orange{
+    background:orange;
+}
+
+.red{
+    background:red;
+}
+
+.blue{
+    background:blue;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:15px;
+}
+
+th,td{
+    border:1px solid #ddd;
+    padding:8px;
+    text-align:left;
+}
+
+.summary{
+    margin-top:20px;
+    padding:15px;
+    background:#f1f5f9;
+    border-radius:8px;
+}
+
+.action-box{
+    background:#f8fafc;
+    padding:15px;
+    margin-top:20px;
+    border-radius:8px;
+}
+
+</style>
+
+<div class="invoice-box">
+
+<!-- ========================== -->
+<!-- 🧾 HEADER -->
+<!-- ========================== -->
+<h2>🧾 ERP INVOICE #<?= (int)$order['id'] ?></h2>
+
+<div class="row">
+
+    <div>
+
+        <b>Customer:</b>
+        <?= htmlspecialchars($order['customer_name'] ?? 'Walk-in') ?>
+
+        <br>
+
+        <b>Phone:</b>
+        <?= htmlspecialchars($order['phone'] ?? '') ?>
+
+        <br>
+
+        <b>Date:</b>
+        <?= htmlspecialchars($order['order_date'] ?? '') ?>
+
+        <br>
+
+        <b>Time:</b>
+        <?= htmlspecialchars($order['order_time'] ?? '') ?>
+
+    </div>
+
+    <div>
+
+        <b>Payment:</b>
+        <?= strtoupper(htmlspecialchars($order['payment_method'] ?? '')) ?>
+
+        <br>
+
+        <b>Payment Status:</b>
+
+        <span class="badge
+            <?= ($order['payment_status'] ?? '')=='paid'
+                ? 'green'
+                : 'orange'
+            ?>
+        ">
+
+            <?= strtoupper(htmlspecialchars($order['payment_status'] ?? '')) ?>
+
+        </span>
+
+        <br><br>
+
+        <b>Order Status:</b>
+
+        <span class="badge
+            <?= ($order['status'] ?? '')=='Delivered'
+                ? 'green'
+                : (
+                    ($order['status'] ?? '')=='Processing'
+                    ? 'blue'
+                    : 'orange'
+                )
+            ?>
+        ">
+
+            <?= strtoupper(htmlspecialchars($order['status'] ?? '')) ?>
+
+        </span>
+
+    </div>
+
+</div>
+
+<hr>
+
+<!-- ========================== -->
+<!-- 📦 ITEMS -->
+<!-- ========================== -->
+<h3>📦 Items</h3>
+
+<p>
+    <?= nl2br(htmlspecialchars($order['items_taken'] ?? '')) ?>
+</p>
+
+<table>
+
+<tr>
+
+    <th>Product</th>
+
+    <th>Qty</th>
+
+    <th>Price</th>
+
+    <th>Cost</th>
+
+    <th>Profit</th>
+
+</tr>
+
+<?php if ($items && $items->num_rows > 0): ?>
+
+    <?php while($i = $items->fetch_assoc()):
+
+    $qty = $i['qty'] ?? 1;
+
+    $sale = $i['price'] ?? 0;
+
+    $cost = $i['cost_price'] ?? 0;
+
+    $profit = ($sale - $cost) * $qty;
+
+    $total_cost += $cost * $qty;
+
+    $total_profit += $profit;
+    ?>
+
+    <tr>
+
+        <td>
+            <?= htmlspecialchars($i['name'] ?? '') ?>
+        </td>
+
+        <td>
+            <?= (int)$qty ?>
+        </td>
+
+        <td>
+            KES <?= number_format($sale,2) ?>
+        </td>
+
+        <td>
+            KES <?= number_format($cost,2) ?>
+        </td>
+
+        <td style="color:<?= $profit>=0?'green':'red' ?>">
+
+            KES <?= number_format($profit,2) ?>
+
+        </td>
+
+    </tr>
+
+    <?php endwhile; ?>
+
+<?php else: ?>
+
+<tr>
+
+    <td colspan="5">
+
+        No item records found
+
+    </td>
+
+</tr>
+
+<?php endif; ?>
+
+</table>
+
+<!-- ========================== -->
+<!-- 🚚 RIDER INFO -->
+<!-- ========================== -->
+<h3>🚚 Delivery</h3>
+
+<?php if($rider): ?>
+
+    <p>
+
+        Rider:
+        <b><?= htmlspecialchars($rider['name']) ?></b>
+
+        <br>
+
+        Phone:
+        <?= htmlspecialchars($rider['phone'] ?? 'N/A') ?>
+
+    </p>
+
+<?php else: ?>
+
+    <p style="color:orange">
+        ⚠️ No rider assigned
+    </p>
+
+<?php endif; ?>
+
+<!-- ========================== -->
+<!-- 💰 SUMMARY -->
+<!-- ========================== -->
+<div class="summary">
+
+    <h3>💰 Financial Summary</h3>
+
+    <p>
+
+        <b>Order Total:</b>
+
+        KES <?= number_format((float)($order['total_amount'] ?? 0),2) ?>
+
+    </p>
+
+    <p>
+
+        <b>Total Cost:</b>
+
+        KES <?= number_format($total_cost,2) ?>
+
+    </p>
+
+    <p>
+
+        <b>Net Profit:</b>
+
+        <span style="color:<?= $total_profit>=0?'green':'red' ?>">
+
+            KES <?= number_format($total_profit,2) ?>
+
+        </span>
+
+    </p>
+
+</div>
+
+<!-- ========================== -->
+<!-- 💰 RECEIVE PAYMENT -->
+<!-- ========================== -->
+<div class="action-box">
+
+<h3>💰 Receive Payment</h3>
+
+<form method="POST">
+
+    <label>Payment Method</label>
+
+    <br><br>
+
+    <select name="payment_method">
+
+        <option value="cash">
+            Cash
+        </option>
+
+        <option value="mpesa">
+            M-Pesa
+        </option>
+
+        <option value="invoice">
+            Invoice
+        </option>
+
+    </select>
+
+    <br><br>
+
+    <button
+        type="submit"
+        name="receive_payment"
+    >
+        💰 Mark As Paid
+    </button>
+
+</form>
+
+</div>
+
+<!-- ========================== -->
+<!-- 🚚 MARK DELIVERED -->
+<!-- ========================== -->
+<div class="action-box">
+
+<h3>🚚 Delivery Status</h3>
+
+<form method="POST">
+
+    <button
+        type="submit"
+        name="mark_delivered"
+    >
+        ✅ Mark As Delivered
+    </button>
+
+</form>
+
+</div>
+
+<!-- ========================== -->
+<!-- 🧠 ACTIONS -->
+<!-- ========================== -->
+<br>
+
+<button onclick="window.print()">
+    🖨 Print Invoice
+</button>
+
+<a href="/infinity/admin/pages/dashboard.php?tab=orders">
+
+    <button>
+        ⬅ Back
+    </button>
+
+</a>
+
+</div>

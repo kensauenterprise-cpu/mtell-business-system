@@ -1,0 +1,42 @@
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+
+// FETCH ORDERS
+$orders = $conn->query("
+    SELECT id, total_amount, payment_method, payment_status, created_at 
+    FROM orders 
+    ORDER BY id DESC
+");
+?>
+
+<h2>🧾 Invoices</h2>
+
+<table border="1" width="100%" cellpadding="8">
+<tr>
+    <th>ID</th>
+    <th>Total</th>
+    <th>Payment</th>
+    <th>Status</th>
+    <th>Date</th>
+    <th>Action</th>
+</tr>
+
+<?php while($o = $orders->fetch_assoc()): ?>
+<tr>
+    <td>#<?= $o['id'] ?></td>
+    <td>KES <?= $o['total_amount'] ?></td>
+    <td><?= $o['payment_method'] ?></td>
+    <td><?= $o['payment_status'] ?></td>
+    <td><?= $o['created_at'] ?></td>
+    <td>
+        <button onclick="printInvoice(<?= $o['id'] ?>)">🖨️ Print</button>
+    </td>
+</tr>
+<?php endwhile; ?>
+</table>
+
+<script>
+function printInvoice(id){
+    window.open("/infinity/admin/invoices/print_invoice.php?id=" + id, "_blank");
+}
+</script>

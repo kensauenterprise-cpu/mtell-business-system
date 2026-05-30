@@ -1,0 +1,47 @@
+<?php
+// ==========================
+// ⚠️ ERROR LOGGING
+// ==========================
+ini_set('log_errors', 1);
+ini_set('error_log', $_SERVER['DOCUMENT_ROOT'] . '/infinity/logs/error_log.txt');
+error_reporting(E_ALL);
+
+// ==========================
+// 🗄️ RAILWAY DATABASE CREDENTIALS
+// ==========================
+$host     = 'turntable.proxy.rlwy.net';
+$username = 'root';
+$password = 'RyOHbmKVKeAiGfmCNsUOcAZIkGoZBZBe';
+$database = 'railway';
+$port     = 34231;
+
+// ==========================
+// 🔌 CONNECT TO RAILWAY MYSQL
+// ==========================
+$conn = new mysqli(
+    $host,
+    $username,
+    $password,
+    $database,
+    $port
+);
+
+// ==========================
+// ❌ HANDLE CONNECTION ERROR
+// ==========================
+if ($conn->connect_error) {
+    error_log("DB ERROR: " . $conn->connect_error);
+
+    die("
+    <div style='background:#ffe0e0;padding:15px;color:#900;font-family:Arial'>
+        ❌ Railway database connection failed<br>
+        <small>{$conn->connect_error}</small>
+    </div>
+    ");
+}
+
+// ==========================
+// 🔤 SET CHARSET
+// ==========================
+$conn->set_charset("utf8mb4");
+?>

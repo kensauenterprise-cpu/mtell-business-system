@@ -1,0 +1,33 @@
+<?php
+// 📊 Callback Match Status Widget
+$conn = $GLOBALS['conn'] ?? null;
+if (!$conn || !$conn instanceof mysqli) {
+    echo "<div class='widget-error'>❌ DB connection failed</div>";
+    return;
+}
+
+$latestInsert = null;
+$insertStmt = $conn->prepare("SELECT checkout_request_id FROM transactions ORDER BY id DESC LIMIT 1");
+if ($insertStmt && $insertStmt->execute()) {
+    $insertStmt->bind_result($latestInsert);
+    $insertStmt->fetch();
+    $insertStmt->close();
+}
+
+$latestCallback = null;
+$callbackStmt = $conn->prepare("SELECT checkout_request_id FROM callback_audit ORDER BY id DESC LIMIT 1");
+if ($callbackStmt && $callbackStmt->execute()) {
+    $callbackStmt->bind_result($latestCallback);
+    $callbackStmt->fetch();
+    $callbackStmt->close();
+}
+
+$matchStatus = ($latestInsert === $latestCallback) ? "✅ Matched" : "⚠️ Unmatched";
+
+echo "<div class='dashboard-widget'>";
+echo "<h3>📦 Callback Match Status</h3>";
+echo "<p><strong>Last Inserted:</strong> <code>$latestInsert</code></p>";
+echo "<p><strong>Last Callback:</strong> <code>$latestCallback</code></p>";
+echo "<p><strong>Status:</strong> <span style='color:" . ($matchStatus === '✅ Matched' ? 'green' : 'orange') . ";'>$matchStatus</span></p>";
+echo "</div>";
+?>

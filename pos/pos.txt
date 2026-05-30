@@ -1,0 +1,368 @@
+<?php 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+// ==========================
+// SESSION
+// ==========================
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+// ==========================
+// SESSION + USER
+// ==========================
+$user_id = $_SESSION['user_id'] ?? 0;
+$username = $_SESSION['username'] ?? 'Guest';
+$branch_id = (int)($_SESSION['branch_id'] ?? 1);
+
+// ✅ IMPORTANT: keep dashboard routing
+$base = "?tab=pos";
+
+// ==========================
+// INIT CART
+// ==========================
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
+// ==========================
+// FETCH PRODUCTS
+// ==========================
+$products = $conn->query("
+    SELECT id, name, price, stock, barcode 
+    FROM products 
+    WHERE branch_id = $branch_id
+    ORDER BY name ASC
+");
+
+// ==========================
+// BARCODE ADD
+// ==========================
+if (isset($_GET['barcode'])) {
+
+    $barcode = $conn->real_escape_string($_GET['barcode']);
+
+    $res = $conn->query("
+        SELECT id FROM products 
+        WHERE barcode = '$barcode' 
+        AND branch_id = $branch_id
+        LIMIT 1
+    ");
+
+    if ($res && $res->num_rows) {
+        $p = $res->fetch_assoc();
+        header("Location: {$base}&add=".$p['id']."&focus=cart");
+        exit;
+    } else {
+        echo "<script>alert('❌ Product not found');</script>";
+    }
+}
+
+// ==========================
+// ADD TO CART
+// ==========================
+if (isset($_GET['add'])) {
+
+    $id = (int)$_GET['add'];
+
+    $res = $conn->query("SELECT stock FROM products WHERE id=$id");
+    $p = $res->fetch_assoc();
+
+    if ($p && $p['stock'] > ($_SESSION['cart'][$id] ?? 0)) {
+        $_SESSION['cart'][$id] = ($_SESSION['cart'][$id] ?? 0) + 1;
+    }
+
+    header("Location: {$base}&focus=cart");
+    exit;
+}
+
+// ==========================
+// REMOVE
+// ==========================
+if (isset($_GET['remove'])) {
+    unset($_SESSION['cart'][(int)$_GET['remove']]);
+    header("Location: {$base}&focus=cart");
+    exit;
+}
+
+// ==========================
+// QTY CONTROL
+// ==========================
+if (isset($_GET['inc'])) {
+    $_SESSION['cart'][(int)$_GET['inc']]++;
+    header("Location: {$base}&focus=cart");
+    exit;
+}
+
+if (isset($_GET['dec'])) {
+    $id = (int)$_GET['dec'];
+    $_SESSION['cart'][$id]--;
+
+    if ($_SESSION['cart'][$id] <= 0) {
+        unset($_SESSION['cart'][$id]);
+    }
+
+    header("Location: {$base}&focus=cart");
+    exit;
+}
+
+// ==========================
+// CHECKOUT
+// ==========================
+if (isset($_POST['checkout'])) {
+
+    $payment = $_POST['payment'];
+    $phone   = trim($_POST['phone'] ?? '');
+    $customer_id = $_POST['customer_id'] ?: NULL;
+
+    $total = 0;
+
+    if (empty($_SESSION['cart'])) {
+        die("❌ Cart empty");
+    }
+
+    foreach ($_SESSION['cart'] as $pid => $qty) {
+
+        $res = $conn->query("SELECT price, stock FROM products WHERE id=$pid");
+        $p = $res->fetch_assoc();
+
+        if ($qty > $p['stock']) {
+            die("❌ Not enough stock");
+        }
+
+        $total += $p['price'] * $qty;
+    }
+
+    // STATUS
+    $status_map = [
+        'cash' => 'paid',
+        'mpesa' => 'pending',
+        'invoice' => 'credit'
+    ];
+    $status = $status_map[$payment] ?? 'paid';
+
+    // INSERT SALE
+    $stmt = $conn->prepare("
+        INSERT INTO sales (total, payment_method, branch_id, user_id, status, customer_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+
+    $stmt->bind_param("dsiisi", $total, $payment, $branch_id, $user_id, $status, $customer_id);
+    $stmt->execute();
+
+    $sale_id = $stmt->insert_id;
+    $stmt->close();
+
+    // ITEMS + STOCK
+    foreach ($_SESSION['cart'] as $pid => $qty) {
+
+        $res = $conn->query("SELECT price FROM products WHERE id=$pid");
+        $p = $res->fetch_assoc();
+
+        $conn->query("
+            INSERT INTO sale_items (sale_id, product_id, qty, price)
+            VALUES ($sale_id, $pid, $qty, {$p['price']})
+        ");
+
+        $conn->query("
+            UPDATE products SET stock = stock - $qty WHERE id = $pid
+        ");
+    }
+
+    // CREDIT UPDATE
+    if ($payment === 'invoice' && $customer_id) {
+        $conn->query("
+            UPDATE customers 
+            SET credit_balance = credit_balance + $total 
+            WHERE id = $customer_id
+        ");
+    }
+
+    // MPESA
+    if ($payment === 'mpesa') {
+
+        $conn->query("
+            INSERT INTO mpesa_transactions (order_id, amount, phone, status)
+            VALUES ($sale_id, $total, '$phone', 'Pending')
+        ");
+
+        $_SESSION['cart'] = [];
+
+        echo "<script>
+        fetch('/infinity/mpesa/stk_push.php', {
+            method: 'POST',
+            headers: {'Content-Type':'application/x-www-form-urlencoded'},
+            body: 'phone={$phone}&amount={$total}&order_id={$sale_id}'
+        })
+        .then(()=>alert('📲 STK Sent'))
+        .finally(()=>window.location='{$base}&receipt={$sale_id}');
+        </script>";
+        exit;
+    }
+
+    $_SESSION['cart'] = [];
+    header("Location: {$base}&receipt=$sale_id");
+    exit;
+}
+
+// ==========================
+// RECEIPT
+// ==========================
+if (isset($_GET['receipt'])) {
+
+    $sale_id = (int)$_GET['receipt'];
+
+    $sale = $conn->query("SELECT * FROM sales WHERE id=$sale_id")->fetch_assoc();
+
+    $items = $conn->query("
+        SELECT p.name, si.qty, si.price 
+        FROM sale_items si
+        JOIN products p ON p.id = si.product_id
+        WHERE si.sale_id=$sale_id
+    ");
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>POS</title>
+
+<style>
+body { font-family:Arial; display:flex; margin:0; }
+
+.products {
+    width:65%;
+    padding:20px;
+    display:grid;
+    grid-template-columns: repeat(4,1fr);
+    gap:10px;
+}
+
+.product {
+    background:white;
+    padding:10px;
+    border-radius:10px;
+    text-align:center;
+}
+
+.product a {
+    display:block;
+    background:#3b82f6;
+    color:white;
+    padding:6px;
+    margin-top:5px;
+    border-radius:6px;
+    text-decoration:none;
+}
+
+.cart {
+    width:35%;
+    background:#0f172a;
+    color:white;
+    padding:20px;
+}
+
+button { padding:8px; margin:2px; }
+input, select { width:100%; padding:8px; margin-top:8px; }
+</style>
+</head>
+
+<body>
+
+<?php if (isset($sale)): ?>
+
+<div id="receipt" style="margin:auto;width:300px;">
+<h3>🧾 RECEIPT</h3>
+
+<?php while($i = $items->fetch_assoc()): ?>
+<div><?= $i['name'] ?> x<?= $i['qty'] ?></div>
+<?php endwhile; ?>
+
+<hr>
+<b>KES <?= number_format($sale['total'],2) ?></b>
+
+<br><br>
+<button onclick="window.print()">🖨 Print</button>
+</div>
+
+<?php else: ?>
+
+<!-- BARCODE -->
+<input type="text" id="barcodeInput" placeholder="Scan barcode..." autofocus>
+
+<div class="products">
+<?php while($p = $products->fetch_assoc()): ?>
+<div class="product">
+<b><?= $p['name'] ?></b><br>
+KES <?= $p['price'] ?><br>
+<a href="?tab=pos&add=<?= $p['id'] ?>">➕ Add</a>
+</div>
+<?php endwhile; ?>
+</div>
+
+<div class="cart" id="cart">
+<h2>🛒 Cart</h2>
+
+<?php
+$total = 0;
+foreach ($_SESSION['cart'] as $pid => $qty):
+
+$res = $conn->query("SELECT name, price FROM products WHERE id=$pid");
+$item = $res->fetch_assoc();
+
+$subtotal = $item['price'] * $qty;
+$total += $subtotal;
+?>
+
+<div>
+<?= $item['name'] ?>
+<button onclick="location.href='?tab=pos&dec=<?= $pid ?>'">-</button>
+<?= $qty ?>
+<button onclick="location.href='?tab=pos&inc=<?= $pid ?>'">+</button>
+= <?= $subtotal ?>
+</div>
+
+<?php endforeach; ?>
+
+<h3>Total: <?= $total ?></h3>
+
+<form method="POST">
+<select name="payment">
+<option value="cash">Cash</option>
+<option value="mpesa">MPESA</option>
+<option value="invoice">Invoice</option>
+</select>
+
+<select name="customer_id">
+<option value="">Walk-in</option>
+<?php
+$c = $conn->query("SELECT id,name FROM customers");
+while($x = $c->fetch_assoc()):
+?>
+<option value="<?= $x['id'] ?>"><?= $x['name'] ?></option>
+<?php endwhile; ?>
+</select>
+
+<input type="text" name="phone" placeholder="MPESA phone">
+
+<button name="checkout">Checkout</button>
+</form>
+
+</div>
+
+<script>
+document.getElementById("barcodeInput").addEventListener("keypress", function(e){
+    if(e.key==="Enter"){
+        window.location="?tab=pos&barcode="+this.value;
+    }
+});
+</script>
+
+<?php endif; ?>
+
+</body>
+</html>

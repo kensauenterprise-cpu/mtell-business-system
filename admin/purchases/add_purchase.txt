@@ -1,0 +1,151 @@
+
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+
+$products = $conn->query("
+    SELECT * FROM products
+    ORDER BY product_name ASC
+");
+
+$suppliers = $conn->query("
+    SELECT * FROM suppliers
+    ORDER BY supplier_name ASC
+");
+
+if(isset($_POST['save'])){
+
+    $supplier_id = (int)$_POST['supplier_id'];
+    $product_id = (int)$_POST['product_id'];
+
+    $quantity = (int)$_POST['quantity'];
+
+    $cost_price = (float)$_POST['cost_price'];
+
+    $purchase_date = $_POST['purchase_date'];
+
+    $branch_id = $_SESSION['branch_id'] ?? 1;
+
+    $created_by = $_SESSION['username'] ?? 'System';
+
+    $total_cost = $quantity * $cost_price;
+
+    $stmt = $conn->prepare("
+        INSERT INTO purchases
+        (
+            supplier_id,
+            product_id,
+            quantity,
+            cost_price,
+            total_cost,
+            purchase_date,
+            branch_id,
+            created_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    $stmt->bind_param(
+        "iiiddsis",
+        $supplier_id,
+        $product_id,
+        $quantity,
+        $cost_price,
+        $total_cost,
+        $purchase_date,
+        $branch_id,
+        $created_by
+    );
+
+    $stmt->execute();
+
+    // UPDATE STOCK
+    $update = $conn->prepare("
+        UPDATE products
+        SET stock = stock + ?
+        WHERE id = ?
+    ");
+
+    $update->bind_param(
+        "ii",
+        $quantity,
+        $product_id
+    );
+
+    $update->execute();
+
+    header("Location: purchases.php");
+    exit;
+}
+?>
+
+<h2>➕ Add Purchase</h2>
+
+<form method="POST">
+
+<select name="supplier_id" required>
+
+<option value="">
+    Select Supplier
+</option>
+
+<?php while($s = $suppliers->fetch_assoc()): ?>
+
+<option value="<?= $s['id'] ?>">
+
+<?= htmlspecialchars($s['supplier_name']) ?>
+
+</option>
+
+<?php endwhile; ?>
+
+</select>
+
+<br><br>
+
+<select name="product_id" required>
+
+<option value="">
+    Select Product
+</option>
+
+<?php while($p = $products->fetch_assoc()): ?>
+
+<option value="<?= $p['id'] ?>">
+
+<?= htmlspecialchars($p['product_name']) ?>
+
+</option>
+
+<?php endwhile; ?>
+
+</select>
+
+<br><br>
+
+<input type="number"
+       name="quantity"
+       placeholder="Quantity"
+       required>
+
+<br><br>
+
+<input type="number"
+       step="0.01"
+       name="cost_price"
+       placeholder="Cost Price"
+       required>
+
+<br><br>
+
+<input type="date"
+       name="purchase_date"
+       value="<?= date('Y-m-d') ?>"
+       required>
+
+<br><br>
+
+<button type="submit" name="save">
+    Save Purchase
+</button>
+
+</form>

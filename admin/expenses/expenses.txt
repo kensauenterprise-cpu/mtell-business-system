@@ -1,0 +1,235 @@
+<?php 
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+
+// ==========================
+// 📅 MONTH FILTER
+// ==========================
+$month = $_GET['month'] ?? date('Y-m');
+
+if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+    $month = date('Y-m');
+}
+
+// ==========================
+// ➕ ADD EXPENSE
+// ==========================
+if (isset($_POST['add'])) {
+
+    $description = trim($_POST['description']);
+    $amount      = (float) $_POST['amount'];
+    $category_id = (int) $_POST['category_id'];
+    $date        = $_POST['expense_date'] ?? date('Y-m-d');
+
+    if ($description && $amount > 0) {
+
+        $stmt = $conn->prepare("
+            INSERT INTO expenses 
+            (description, category_id, amount, expense_date)
+            VALUES (?, ?, ?, ?)
+        ");
+
+        $stmt->bind_param(
+            "sids",
+            $description,
+            $category_id,
+            $amount,
+            $date
+        );
+
+        $stmt->execute();
+    }
+
+    header("Location: ?tab=expenses&month=".$month);
+    exit;
+}
+
+// ==========================
+// 📊 FETCH EXPENSES
+// ==========================
+$stmt = $conn->prepare("
+    SELECT 
+        e.*, 
+        c.name AS category_name
+    FROM expenses e
+    LEFT JOIN expense_categories c 
+        ON e.category_id = c.id
+    WHERE DATE_FORMAT(e.expense_date, '%Y-%m') = ?
+    ORDER BY e.expense_date DESC, e.id DESC
+");
+
+$stmt->bind_param("s", $month);
+$stmt->execute();
+
+$expenses = $stmt->get_result();
+
+// ==========================
+// 📊 TOTAL
+// ==========================
+$stmtTotal = $conn->prepare("
+    SELECT 
+        SUM(amount) AS total
+    FROM expenses
+    WHERE DATE_FORMAT(expense_date, '%Y-%m') = ?
+");
+
+$stmtTotal->bind_param("s", $month);
+$stmtTotal->execute();
+
+$total = $stmtTotal
+            ->get_result()
+            ->fetch_assoc()['total'] ?? 0;
+
+// ==========================
+// 📂 FETCH CATEGORIES
+// ==========================
+$categories = $conn->query("
+    SELECT *
+    FROM expense_categories
+    ORDER BY name ASC
+");
+?>
+
+<h2>💸 Expense Management</h2>
+
+<!-- FILTER -->
+<form method="GET">
+
+    <input type="hidden"
+           name="tab"
+           value="expenses">
+
+    <input type="month"
+           name="month"
+           value="<?= htmlspecialchars($month) ?>">
+
+    <button type="submit">
+        Filter
+    </button>
+
+</form>
+
+<h3>
+    📊 Total This Month:
+    <b>KES <?= number_format($total,2) ?></b>
+</h3>
+
+<!-- ADD FORM -->
+<form method="POST">
+
+    <input type="text"
+           name="description"
+           placeholder="Expense description"
+           required>
+
+    <input type="number"
+           step="0.01"
+           name="amount"
+           placeholder="Amount"
+           required>
+
+    <input type="date"
+           name="expense_date"
+           value="<?= date('Y-m-d') ?>"
+           required>
+
+    <select name="category_id">
+
+        <option value="0">
+            No Category
+        </option>
+
+        <?php while($c = $categories->fetch_assoc()): ?>
+
+            <option value="<?= $c['id'] ?>">
+
+                <?= htmlspecialchars($c['name']) ?>
+
+            </option>
+
+        <?php endwhile; ?>
+
+    </select>
+
+    <button type="submit" name="add">
+        Add Expense
+    </button>
+
+    <a href="add_expense.php">
+        ➕ Advanced Add Expense
+    </a>
+
+</form>
+
+<br>
+
+<table border="1" cellpadding="8" cellspacing="0">
+
+<tr>
+    <th>ID</th>
+    <th>Description</th>
+    <th>Category</th>
+    <th>Amount</th>
+    <th>Date</th>
+    <th>Action</th>
+</tr>
+
+<?php if ($expenses->num_rows > 0): ?>
+
+    <?php while ($e = $expenses->fetch_assoc()): ?>
+
+    <tr>
+
+        <td>
+            <?= $e['id'] ?>
+        </td>
+
+        <td>
+            <?= htmlspecialchars($e['description']) ?>
+        </td>
+
+        <td>
+            <?= htmlspecialchars($e['category_name'] ?? 'N/A') ?>
+        </td>
+
+        <td>
+            KES <?= number_format($e['amount'],2) ?>
+        </td>
+
+        <td>
+            <?= htmlspecialchars($e['expense_date']) ?>
+        </td>
+
+        <td>
+
+            <a href="edit_expense.php?id=<?= $e['id'] ?>">
+                ✏ Edit
+            </a>
+
+            |
+
+            <a href="delete_expense.php?id=<?= $e['id'] ?>"
+               onclick="return confirm('Delete this expense?')">
+
+               🗑 Delete
+
+            </a>
+
+        </td>
+
+    </tr>
+
+    <?php endwhile; ?>
+
+<?php else: ?>
+
+<tr>
+
+    <td colspan="6">
+        No expenses found for this month.
+    </td>
+
+</tr>
+
+<?php endif; ?>
+
+</table>

@@ -1,0 +1,83 @@
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+// ==========================
+// CONFIG (LIVE)
+// ==========================
+$consumerKey = "YOUR_KEY";
+$consumerSecret = "YOUR_SECRET";
+$shortCode = "5669370"; 
+$passkey = "YOUR_PASSKEY";
+
+// ==========================
+// GET DATA
+// ==========================
+$phone = preg_replace('/^0/', '254', $_POST['phone']);
+$amount = (int)$_POST['amount'];
+$order_id = (int)$_POST['order_id'];
+
+// ==========================
+// ACCESS TOKEN
+// ==========================
+$credentials = base64_encode($consumerKey.":".$consumerSecret);
+
+$ch = curl_init("https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials");
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Basic $credentials"]);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = json_decode(curl_exec($ch));
+$token = $response->access_token;
+
+// ==========================
+// STK PASSWORD
+// ==========================
+$timestamp = date('YmdHis');
+$password = base64_encode($shortCode.$passkey.$timestamp);
+
+// ==========================
+// REQUEST
+// ==========================
+$data = [
+    "BusinessShortCode" => $shortCode,
+    "Password" => $password,
+    "Timestamp" => $timestamp,
+    "TransactionType" => "CustomerBuyGoodsOnline",
+    "Amount" => $amount,
+    "PartyA" => $phone,
+    "PartyB" => $shortCode,
+    "PhoneNumber" => $phone,
+    "CallBackURL" => "https://mtell.kesug.com/infinity/mpesa/callback.php",
+    "AccountReference" => "SALE".$order_id,
+    "TransactionDesc" => "POS Payment"
+];
+
+$ch = curl_init("https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest");
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "Content-Type: application/json",
+    "Authorization: Bearer $token"
+]);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+
+$result = json_decode(curl_exec($ch), true);
+
+// ==========================
+// SAVE IDS
+// ==========================
+if (isset($result['CheckoutRequestID'])) {
+
+    $checkout_id = $result['CheckoutRequestID'];
+    $merchant_id = $result['MerchantRequestID'];
+
+    $conn->query("
+        UPDATE mpesa_transactions
+        SET 
+            checkout_request_id='$checkout_id',
+            merchant_request_id='$merchant_id',
+            status='Pending'
+        WHERE order_id=$order_id
+    ");
+}
+
+echo json_encode($result);

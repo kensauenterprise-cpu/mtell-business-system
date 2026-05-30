@@ -1,0 +1,91 @@
+<?php
+// ==========================
+// 🔗 DB CONNECTION
+// ==========================
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+// ==========================
+// 📥 RECEIVE RAW DATA
+// ==========================
+$raw = file_get_contents("php://input");
+
+// Save full log for debugging
+file_put_contents(__DIR__ . "/mpesa_log.txt", date("Y-m-d H:i:s")." => ".$raw."\n\n", FILE_APPEND);
+
+// Decode JSON
+$data = json_decode($raw, true);
+
+// ==========================
+// 🔍 VALIDATE STRUCTURE
+// ==========================
+if (!isset($data['Body']['stkCallback'])) {
+    http_response_code(200);
+    echo "OK";
+    exit;
+}
+
+$stk = $data['Body']['stkCallback'];
+
+$checkout_id = $stk['CheckoutRequestID'] ?? '';
+$result_code = $stk['ResultCode'] ?? 1;
+
+// ==========================
+// ✅ SUCCESS CASE
+// ==========================
+if ($result_code == 0) {
+
+    $items = $stk['CallbackMetadata']['Item'] ?? [];
+
+    $amount = 0;
+    $receipt = '';
+    $phone = '';
+
+    foreach ($items as $item) {
+        if ($item['Name'] === 'Amount') {
+            $amount = $item['Value'];
+        }
+        if ($item['Name'] === 'MpesaReceiptNumber') {
+            $receipt = $item['Value'];
+        }
+        if ($item['Name'] === 'PhoneNumber') {
+            $phone = $item['Value'];
+        }
+    }
+
+    // ==========================
+    // 🔄 UPDATE SUCCESS
+    // ==========================
+    $stmt = $conn->prepare("
+        UPDATE mpesa_transactions
+        SET 
+            status = 'Completed',
+            receipt_number = ?,
+            updated_at = NOW()
+        WHERE checkout_request_id = ?
+    ");
+
+    $stmt->bind_param("ss", $receipt, $checkout_id);
+    $stmt->execute();
+
+} else {
+
+    // ==========================
+    // ❌ FAILED / CANCELLED
+    // ==========================
+    $stmt = $conn->prepare("
+        UPDATE mpesa_transactions
+        SET 
+            status = 'Failed',
+            updated_at = NOW()
+        WHERE checkout_request_id = ?
+    ");
+
+    $stmt->bind_param("s", $checkout_id);
+    $stmt->execute();
+}
+
+// ==========================
+// 📤 RESPONSE TO SAFARICOM
+// ==========================
+http_response_code(200);
+echo "OK";

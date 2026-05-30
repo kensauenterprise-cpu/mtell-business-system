@@ -1,0 +1,107 @@
+<?php
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+// ==========================
+// DATABASE STATUS
+// ==========================
+$db_status = "Offline";
+
+if (isset($conn) && $conn) {
+
+    if ($conn->ping()) {
+        $db_status = "Online";
+    }
+}
+
+// ==========================
+// SERVER STATUS
+// ==========================
+$server_status = "Online";
+
+// ==========================
+// PHP VERSION
+// ==========================
+$php_version = phpversion();
+
+?>
+
+<div style="
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+">
+
+<h2>📡 API Health Monitor</h2>
+
+<table
+border="1"
+cellpadding="10"
+cellspacing="0"
+width="100%"
+style="border-collapse:collapse;margin-top:20px;"
+>
+
+<tr style="background:#0f172a;color:white;">
+
+<th>Service</th>
+<th>Status</th>
+
+</tr>
+
+<tr>
+
+<td>Database Connection</td>
+
+<td style="color:<?= $db_status === 'Online' ? 'green' : 'red' ?>;font-weight:bold;">
+
+<?= htmlspecialchars($db_status) ?>
+
+</td>
+
+</tr>
+
+<tr>
+
+<td>Server Status</td>
+
+<td style="color:green;font-weight:bold;">
+
+<?= htmlspecialchars($server_status) ?>
+
+</td>
+
+</tr>
+
+<tr>
+
+<td>PHP Version</td>
+
+<td>
+
+<?= htmlspecialchars($php_version) ?>
+
+</td>
+
+</tr>
+
+<tr>
+
+<td>Session Status</td>
+
+<td style="color:green;font-weight:bold;">
+
+<?= session_status() === PHP_SESSION_ACTIVE ? 'Active' : 'Inactive' ?>
+
+</td>
+
+</tr>
+
+</table>
+
+</div>

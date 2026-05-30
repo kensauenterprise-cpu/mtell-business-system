@@ -1,0 +1,24 @@
+# ✅ Enforce HTTPS if SSL is correctly installed
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ✅ Default index files in order
+DirectoryIndex index.php index.html index.htm
+
+# ✅ Custom error documents
+ErrorDocument 403 https://errors.infinityfree.net/errors/403/
+ErrorDocument 404 https://errors.infinityfree.net/errors/404/
+ErrorDocument 500 https://errors.infinityfree.net/errors/500/
+
+# ✅ Display PHP errors during development
+php_flag display_errors On
+
+# ✅ Allow direct access to retry_stkpush.php and other API endpoints
+RewriteCond %{REQUEST_URI} ^/infinity/api/retry_stkpush.php$ [NC]
+RewriteRule ^ - [L]
+
+# ✅ Allow access to other valid files and folders
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [L,QSA]

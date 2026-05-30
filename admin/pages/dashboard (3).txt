@@ -1,0 +1,562 @@
+<?php 
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/role.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+// ==========================
+// SESSION (SAFE INIT)
+// ==========================
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// ==========================
+// ✅ GLOBAL FIX (branch)
+// ==========================
+if (!isset($_SESSION['branch_id'])) {
+    $_SESSION['branch_id'] = 1;
+}
+
+// ==========================
+// SESSION VALUES
+// ==========================
+$role = strtolower(trim($_SESSION['role'] ?? 'guest'));
+$username = trim($_SESSION['username'] ?? 'User');
+
+// ==========================
+// ✅ VALID ROLES
+// ==========================
+if (!in_array($role, ['super_admin','admin','manager','cashier','it'])) {
+    $role = 'guest';
+}
+
+// ==========================
+// 🔒 AUTH CHECK
+// ==========================
+if ($role === 'guest') {
+    header("Location: /infinity/admin/pages/login.php");
+    exit;
+}
+
+// ==========================
+// 🔒 BRANCH CONTROL
+// ==========================
+if ($role === 'super_admin' || $role === 'it') {
+
+    if (isset($_GET['branch_id'])) {
+
+        $_SESSION['branch_id'] = ($_GET['branch_id'] === 'all')
+            ? 'all'
+            : (int)$_GET['branch_id'];
+    }
+
+} elseif ($role === 'admin') {
+
+    if (isset($_GET['branch_id'])) {
+        $_SESSION['branch_id'] = (int)$_GET['branch_id'];
+    }
+}
+
+// ==========================
+// ✅ FINAL branch value
+// ==========================
+$branch_id = $_SESSION['branch_id'] ?? 1;
+
+// ==========================
+// 🌿 LOAD BRANCH FILTER
+// ==========================
+$branch_filter = true;
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/branch_filter.php';
+
+// ==========================
+// ✅ BRANCH NAME FIX
+// ==========================
+$branch_name = 'Unknown';
+
+if (isset($conn)) {
+
+    if (
+        strtolower($username) === 'mtellchashier@outlook.com' ||
+        strtolower($username) === 'mtellchashier3@outlook.com'
+    ) {
+
+        $branch_name = 'naroosura';
+
+    } else {
+
+        if ($branch_id !== 'all') {
+
+            $stmt = $conn->prepare("
+                SELECT name
+                FROM branches
+                WHERE id = ?
+                LIMIT 1
+            ");
+
+            if ($stmt) {
+
+                $stmt->bind_param("i", $branch_id);
+                $stmt->execute();
+
+                $result = $stmt->get_result();
+
+                if ($result && $row = $result->fetch_assoc()) {
+                    $branch_name = $row['name'];
+                }
+
+                $stmt->close();
+            }
+
+        } else {
+
+            $branch_name = 'All Branches';
+        }
+    }
+}
+
+// ==========================
+// ALL TABS
+// ==========================
+$all_tabs = [
+    'home','dashboard','orders','products','inventory','financials',
+    'transactions','riders','system','users','expenses','reports',
+    'customers','suppliers','pos','invoices','purchases',
+    'branch_compare','ai',
+    'add_user','edit_user','delete_user','change_password',
+
+    // IT TOOLS
+    'system_logs','sessions','api_health','maintenance'
+];
+
+// ==========================
+$tab = $_GET['tab'] ?? 'home';
+$tab = in_array($tab, $all_tabs) ? $tab : 'home';
+
+// ==========================
+// ROLE PERMISSIONS
+// ==========================
+function canAccess($tab, $role) {
+
+    global $all_tabs;
+
+    $permissions = [
+
+        'super_admin' => $all_tabs,
+        'admin' => $all_tabs,
+        'it' => $all_tabs,
+
+        'manager' => [
+            'home','dashboard','orders','inventory','financials',
+            'reports','customers','suppliers','expenses','purchases'
+        ],
+
+        'cashier' => [
+            'home','orders','products','pos','transactions'
+        ]
+    ];
+
+    return in_array($tab, $permissions[$role] ?? []);
+}
+
+// ==========================
+// SAFE INCLUDE
+// ==========================
+function safeInclude($file) {
+
+    global $conn;
+
+    if (!isset($conn)) {
+        return "<p style='color:red'>❌ Database connection missing</p>";
+    }
+
+    if (!file_exists($file)) {
+        return "<p style='color:red'>❌ File not found: $file</p>";
+    }
+
+    ob_start();
+    include $file;
+    return ob_get_clean();
+}
+
+// ==========================
+// RENDER TAB
+// ==========================
+function renderTab($tab) {
+
+    global $role;
+
+    if (!canAccess($tab, $role)) {
+        return "<p style='color:red'>⛔ Access denied</p>";
+    }
+
+    switch ($tab) {
+
+        case 'home':
+            return "<h2>📊 Executive Dashboard</h2>";
+
+        case 'dashboard':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/pages/dashboard.php');
+
+        case 'orders':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/orders/orders.php');
+
+        case 'products':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/products/products.php');
+
+        case 'customers':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/customers/customers.php');
+
+        case 'suppliers':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/suppliers/suppliers.php');
+
+        case 'transactions':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/transactions/transactions.php');
+
+        case 'pos':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/pos/pos.php');
+
+        case 'users':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/users/users.php');
+
+        case 'inventory':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/reports/inventory_dashboard.php');
+
+        case 'financials':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/reports/financial_reports.php');
+
+        case 'reports':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/reports/reports.php');
+
+        case 'expenses':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/expenses/expenses.php');
+
+        // ✅ PURCHASES ADDED
+        case 'purchases':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/purchases/purchases.php');
+
+        case 'system':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/system/system.php');
+
+        case 'invoices':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/invoices/invoices.php');
+
+        case 'riders':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/riders/riders.php');
+
+        case 'branch_compare':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/dashboard/branch_comparison.php');
+
+        case 'ai':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/dashboard/ai_dashboard.php');
+
+        case 'add_user':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/users/add_user.php');
+
+        case 'edit_user':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/users/edit_user.php');
+
+        case 'delete_user':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/users/delete_user.php');
+
+        case 'change_password':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/users/change_password.php');
+
+        case 'system_logs':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/system/logs.php');
+
+        case 'sessions':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/system/sessions.php');
+
+        case 'api_health':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/system/api_health.php');
+
+        case 'maintenance':
+            return safeInclude($_SERVER['DOCUMENT_ROOT'].'/infinity/admin/system/maintenance.php');
+
+        default:
+            return "<p>Page not found</p>";
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Admin Panel</title>
+
+<style>
+
+body{
+    margin:0;
+    font-family:Arial;
+    display:flex;
+    height:100vh;
+    flex-direction:row-reverse;
+}
+
+.sidebar{
+    width:240px;
+    background:#0f172a;
+    color:white;
+    height:100vh;
+    padding:20px;
+    box-sizing:border-box;
+    overflow-y:auto;
+}
+
+.sidebar a{
+    display:flex;
+    justify-content:space-between;
+    color:#cbd5f5;
+    padding:10px;
+    margin:5px 0;
+    text-decoration:none;
+    border-radius:8px;
+}
+
+.sidebar a:hover{
+    background:#1e293b;
+}
+
+.sidebar a.active{
+    background:#3b82f6;
+}
+
+.badge{
+    background:#22c55e;
+    padding:2px 6px;
+    border-radius:10px;
+    font-size:12px;
+}
+
+.warning{
+    background:#f59e0b;
+}
+
+.main{
+    flex:1;
+    background:#f1f5f9;
+    overflow:auto;
+}
+
+.topbar{
+    background:white;
+    padding:15px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.content{
+    padding:20px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<h2>🚀 Admin</h2>
+
+<?php
+
+$menu = [
+
+    'home'=>"🏠 Dashboard",
+    'dashboard'=>"📊 Analytics",
+
+    'branch_compare'=>"🏢 Branch Comparison",
+    'ai'=>"🧠 AI Predictions",
+
+    'orders'=>"📦 Orders",
+    'products'=>"🛍 Products",
+
+    'customers'=>"👥 Customers",
+    'suppliers'=>"🏭 Suppliers",
+
+    // ✅ PURCHASES MENU
+    'purchases'=>"📥 Purchases",
+
+    'transactions'=>"💳 Transactions",
+    'pos'=>"🧾 POS",
+
+    'inventory'=>"📦 Inventory",
+
+    'financials'=>"💰 Financials",
+
+    'expenses'=>"💸 Expenses",
+
+    'reports'=>"📊 Reports",
+
+    'users'=>"👥 Users"
+];
+
+foreach ($menu as $key => $label) {
+
+    if (canAccess($key, $role)) {
+
+        echo "<a href='?tab=$key' class='".($tab==$key?'active':'')."'>
+
+        $label
+
+        ".($key=='orders'
+            ? "<span id='orderBadge' class='badge'></span>"
+            : "")."
+
+        ".($key=='inventory'
+            ? "<span id='stockBadge' class='badge warning'></span>"
+            : "")."
+
+        </a>";
+    }
+}
+
+if ($role === 'it' || $role === 'super_admin') {
+
+    echo "<hr style='border-color:#1e293b'>";
+
+    echo "<p style='color:#94a3b8;font-size:12px'>
+    ⚙️ SYSTEM
+    </p>";
+
+    echo "<a href='?tab=system_logs'>📜 Logs</a>";
+
+    echo "<a href='?tab=sessions'>👥 Sessions</a>";
+
+    echo "<a href='?tab=api_health'>📡 API Health</a>";
+
+    echo "<a href='?tab=maintenance'>🛠 Maintenance</a>";
+}
+
+?>
+
+</div>
+
+<div class="main">
+
+<div class="topbar">
+
+<div>
+
+Welcome,
+<b><?= htmlspecialchars($username) ?></b>
+
+<br>
+
+<small style="color:#64748b;">
+
+Branch:
+<b><?= htmlspecialchars($branch_name) ?></b>
+
+</small>
+
+</div>
+
+<form method="GET">
+
+<input type="hidden"
+       name="tab"
+       value="<?= htmlspecialchars($tab) ?>">
+
+<select name="branch_id"
+
+onchange="this.form.submit()"
+
+<?= ($role !== 'admin'
+&& $role !== 'super_admin'
+&& $role !== 'it')
+
+? 'disabled style="opacity:0.6;cursor:not-allowed"'
+
+: '' ?>>
+
+<option value="all"
+<?= $branch_id=='all'?'selected':'' ?>>
+
+🌍 All Branches
+
+</option>
+
+<option value="1"
+<?= $branch_id==1?'selected':'' ?>>
+
+Nairobi HQ
+
+</option>
+
+<option value="2"
+<?= $branch_id==2?'selected':'' ?>>
+
+Mogotio
+
+</option>
+
+<option value="3"
+<?= $branch_id==3?'selected':'' ?>>
+
+Naroosura
+
+</option>
+
+</select>
+
+</form>
+
+<a href="/infinity/admin/pages/logout.php">
+🚪 Logout
+</a>
+
+</div>
+
+<div class="content">
+
+<?= renderTab($tab); ?>
+
+</div>
+
+</div>
+
+<script>
+
+function loadAlerts(){
+
+    fetch("/infinity/admin/api/low_stock.php?branch_id=<?= $branch_id ?>")
+
+    .then(r=>r.json())
+
+    .then(d=>{
+
+        let b=document.getElementById("stockBadge");
+
+        if(b){
+            b.innerText=d.length || "";
+        }
+    });
+
+    fetch("/infinity/admin/api/orders_count.php?branch_id=<?= $branch_id ?>")
+
+    .then(r=>r.json())
+
+    .then(d=>{
+
+        let b=document.getElementById("orderBadge");
+
+        if(b){
+            b.innerText=d.pending || "";
+        }
+    });
+}
+
+loadAlerts();
+
+setInterval(loadAlerts,10000);
+
+</script>
+
+</body>
+</html>

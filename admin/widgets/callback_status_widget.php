@@ -1,0 +1,39 @@
+<?php
+// ===============================
+// 🔍 Callback Match Status Widget
+// ===============================
+$logDir = __DIR__ . "/../retry_queue"; // Adjusted if retry_queue is outside admin/
+$monthLog = "callback_" . date("Y_m") . ".log";
+$logPath = __DIR__ . "/../logs/" . $monthLog; // ✅ Corrected path to logs folder
+
+// ✅ Fetch recent transactions
+$stmt = $conn->prepare("SELECT checkout_request_id FROM transactions ORDER BY created_at DESC LIMIT 20");
+$stmt->execute();
+$result = $stmt->get_result();
+
+echo "<table border='1' cellpadding='6' style='border-collapse: collapse; font-family: monospace;'>";
+echo "<tr><th>checkout_request_id</th><th>Inserted</th><th>Callback received</th><th>Retry queued</th></tr>";
+
+while ($row = $result->fetch_assoc()) {
+    $id = $row['checkout_request_id'];
+
+    // ✅ Inserted: always true since it's from DB
+    $inserted = "✅";
+
+    // ✅ Callback received: check if ID exists in log file
+    $callbackReceived = (file_exists($logPath) && strpos(file_get_contents($logPath), $id) !== false) ? "✅" : "❌";
+
+    // ✅ Retry queued: check if retry file exists
+    $retryFile = "$logDir/" . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $id) . ".json";
+    $retryQueued = file_exists($retryFile) ? "✅" : "❌";
+
+    echo "<tr>
+            <td>$id</td>
+            <td>$inserted</td>
+            <td>$callbackReceived</td>
+            <td>$retryQueued</td>
+          </tr>";
+}
+echo "</table>";
+$stmt->close();
+?>

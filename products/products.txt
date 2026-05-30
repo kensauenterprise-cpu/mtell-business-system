@@ -1,0 +1,246 @@
+<?php 
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+
+// ==========================
+// 🏢 BRANCH (NEW)
+// ==========================
+$branch_id = $_SESSION['branch_id'] ?? 1;
+
+// ==========================
+// 📦 MODE
+// ==========================
+$mode = $_GET['mode'] ?? 'online';
+
+// ==========================
+// 🔍 FILTERS
+// ==========================
+$search = $_GET['search'] ?? '';
+$category = $_GET['category'] ?? '';
+
+// ==========================
+// ➕ SAVE PRODUCT (ADD / UPDATE)
+// ==========================
+if (isset($_POST['save_product'])) {
+
+    $id         = $_POST['id'] ?? null;
+    $name       = trim($_POST['name']);
+    $desc       = trim($_POST['description']);
+    $retail     = (float) $_POST['retail_price'];
+    $wholesale  = (float) $_POST['wholesale_price'];
+    $online     = (float) $_POST['online_price'];
+    $cost       = (float) $_POST['cost_price'];
+    $stock      = (int) $_POST['stock'];
+    $category   = trim($_POST['category']);
+
+    $imageName = $_POST['existing_image'] ?? 'default.png';
+
+    // ==========================
+    // 📸 IMAGE UPLOAD
+    // ==========================
+    if (!empty($_FILES['image']['name'])) {
+
+        $allowed = ['jpg','jpeg','png','webp'];
+        $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+
+        if (in_array($ext, $allowed)) {
+
+            $targetDir = $_SERVER['DOCUMENT_ROOT'].'/infinity/uploads/';
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+
+            $imageName = time().'_'.uniqid().'.'.$ext;
+            move_uploaded_file($_FILES['image']['tmp_name'], $targetDir.$imageName);
+        }
+    }
+
+    if ($id) {
+        // 🔒 UPDATE ONLY SAME BRANCH
+        $stmt = $conn->prepare("
+            UPDATE products 
+            SET name=?, description=?, retail_price=?, wholesale_price=?, online_price=?, cost_price=?, stock=?, category=?, image=? 
+            WHERE id=? AND branch_id=?
+        ");
+
+        $stmt->bind_param(
+            "ssddddiisii",
+            $name,$desc,$retail,$wholesale,$online,$cost,$stock,$category,$imageName,$id,$branch_id
+        );
+
+    } else {
+        // ✅ INSERT WITH BRANCH
+        $stmt = $conn->prepare("
+            INSERT INTO products 
+            (name, description, retail_price, wholesale_price, online_price, cost_price, stock, category, image, branch_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ");
+
+        $stmt->bind_param(
+            "ssddddiisi",
+            $name,$desc,$retail,$wholesale,$online,$cost,$stock,$category,$imageName,$branch_id
+        );
+    }
+
+    $stmt->execute();
+
+    header("Location: ?tab=products&mode=".$mode);
+    exit;
+}
+
+// ==========================
+// 🗑 DELETE (SECURED)
+// ==========================
+if (isset($_POST['delete_id'])) {
+    $stmt = $conn->prepare("DELETE FROM products WHERE id=? AND branch_id=?");
+    $stmt->bind_param("ii", $_POST['delete_id'], $branch_id);
+    $stmt->execute();
+
+    header("Location: ?tab=products&mode=".$mode);
+    exit;
+}
+
+// ==========================
+// 📦 FETCH PRODUCTS (FIXED)
+// ==========================
+$sql = "SELECT * FROM products WHERE branch_id=?";
+$params = [$branch_id];
+$types = "i";
+
+if ($search) {
+    $sql .= " AND name LIKE ?";
+    $params[] = "%$search%";
+    $types .= "s";
+}
+
+if ($category) {
+    $sql .= " AND category = ?";
+    $params[] = $category;
+    $types .= "s";
+}
+
+$sql .= " ORDER BY id DESC";
+
+$stmt = $conn->prepare($sql);
+$stmt->bind_param($types, ...$params);
+$stmt->execute();
+$result = $stmt->get_result();
+
+// ==========================
+// 📊 STATS (FIXED)
+// ==========================
+$stmt = $conn->prepare("SELECT COUNT(*) as total FROM products WHERE branch_id=?");
+$stmt->bind_param("i", $branch_id);
+$stmt->execute();
+$total_products = $stmt->get_result()->fetch_assoc()['total'];
+
+$stmt = $conn->prepare("SELECT COUNT(*) as total FROM products WHERE stock < 5 AND branch_id=?");
+$stmt->bind_param("i", $branch_id);
+$stmt->execute();
+$low_stock = $stmt->get_result()->fetch_assoc()['total'];
+?>
+
+<h2>🛍️ Products (<?= strtoupper($mode) ?>)</h2>
+
+<div class="stats">
+  <div class="card">📦 Total: <?= $total_products ?></div>
+  <div class="card">⚠️ Low Stock: <?= $low_stock ?></div>
+</div>
+
+<!-- FILTER -->
+<form method="GET">
+  <input type="hidden" name="tab" value="products">
+  <input type="hidden" name="mode" value="<?= $mode ?>">
+
+  <input type="text" name="search" placeholder="Search..." value="<?= htmlspecialchars($search) ?>">
+
+  <select name="category">
+    <option value="">All</option>
+    <option <?= $category=='Electronics'?'selected':'' ?>>Electronics</option>
+    <option <?= $category=='Drinks'?'selected':'' ?>>Drinks</option>
+    <option <?= $category=='Food'?'selected':'' ?>>Food</option>
+  </select>
+
+  <button>Filter</button>
+</form>
+
+<hr>
+
+<!-- ADD PRODUCT -->
+<h3>➕ Add Product</h3>
+<form method="POST" enctype="multipart/form-data">
+  <input name="name" required placeholder="Name">
+  <textarea name="description"></textarea>
+
+  <input type="number" step="0.01" name="retail_price" placeholder="Retail Price">
+  <input type="number" step="0.01" name="wholesale_price" placeholder="Wholesale Price">
+  <input type="number" step="0.01" name="online_price" placeholder="Online Price">
+  <input type="number" step="0.01" name="cost_price" placeholder="Cost Price" required>
+
+  <input type="number" name="stock" placeholder="Stock">
+
+  <select name="category">
+    <option>Electronics</option>
+    <option>Drinks</option>
+    <option>Food</option>
+  </select>
+
+  <input type="file" name="image">
+
+  <button name="save_product">Save Product</button>
+</form>
+
+<hr>
+
+<!-- PRODUCTS -->
+<div class="product-grid">
+
+<?php while($row = $result->fetch_assoc()): 
+
+$price = $row[$mode.'_price'] ?? $row['online_price'];
+$profit = $price - $row['cost_price'];
+$margin = $price > 0 ? ($profit / $price) * 100 : 0;
+?>
+
+<div class="product-card">
+
+<img src="/infinity/uploads/<?= $row['image'] ?: 'default.png' ?>" width="120">
+
+<h3><?= htmlspecialchars($row['name']) ?></h3>
+
+<p><?= htmlspecialchars($row['description']) ?></p>
+
+<p>💰 Price: KES <?= number_format($price,2) ?></p>
+
+<p>💸 Cost: KES <?= number_format($row['cost_price'],2) ?></p>
+
+<p style="color:<?= $profit >= 0 ? 'green' : 'red' ?>">
+📈 Profit: KES <?= number_format($profit,2) ?>
+</p>
+
+<p style="color:<?= $margin >= 30 ? 'green' : ($margin >= 10 ? 'orange':'red') ?>">
+📊 Margin: <?= round($margin,2) ?>%
+</p>
+
+<p>
+📦 Stock: 
+<span style="color:<?= $row['stock'] < 5 ? 'red':'black' ?>">
+<?= $row['stock'] ?>
+</span>
+</p>
+
+<!-- DELETE -->
+<form method="POST" style="display:inline;">
+<input type="hidden" name="delete_id" value="<?= $row['id'] ?>">
+<button onclick="return confirm('Delete product?')">🗑</button>
+</form>
+
+<!-- CART -->
+<form method="POST" action="/infinity/add-to-cart.php" style="display:inline;">
+<input type="hidden" name="product_id" value="<?= $row['id'] ?>">
+<input type="hidden" name="mode" value="<?= $mode ?>">
+<button>🛒</button>
+</form>
+
+</div>
+
+<?php endwhile; ?>
+
+</div>

@@ -1,0 +1,53 @@
+<?php
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+$dbStatus = (
+    isset($conn) &&
+    $conn instanceof mysqli &&
+    !$conn->connect_error
+)
+? 'Online'
+: 'Offline';
+
+$serverStatus = 'Online';
+
+$phpVersion = phpversion();
+
+$sessionStatus = (
+    session_status() === PHP_SESSION_ACTIVE
+)
+? 'Active'
+: 'Inactive';
+?>
+
+<h2>📡 API Health Monitor</h2>
+
+<table border="1" cellpadding="10" cellspacing="0">
+
+<tr>
+    <th>Service</th>
+    <th>Status</th>
+</tr>
+
+<tr>
+    <td>Database Connection</td>
+    <td><?= $dbStatus ?></td>
+</tr>
+
+<tr>
+    <td>Server Status</td>
+    <td><?= $serverStatus ?></td>
+</tr>
+
+<tr>
+    <td>PHP Version</td>
+    <td><?= htmlspecialchars($phpVersion) ?></td>
+</tr>
+
+<tr>
+    <td>Session Status</td>
+    <td><?= $sessionStatus ?></td>
+</tr>
+
+</table>

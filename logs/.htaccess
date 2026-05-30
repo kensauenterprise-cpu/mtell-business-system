@@ -1,0 +1,16 @@
+<FilesMatch "\.(log|txt)$">
+  O# Deny direct access to all files in this folder
+<FilesMatch ".*">
+  Require all denied
+</FilesMatch>
+
+# Allow PHP scripts to write logs internally
+<IfModule mod_php7.c>
+  php_flag engine on
+</IfModule>
+
+# Prevent directory listing
+Options -Indexes
+rder allow,deny
+  Deny from all
+</FilesMatch>

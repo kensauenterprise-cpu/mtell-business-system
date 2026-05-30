@@ -1,0 +1,77 @@
+/* Global Theme Settings */
+:root {
+    --primary-color: #003366;
+    --secondary-color: #f4f4f4;
+    --text-color: #333;
+    --border-color: #ddd;
+}
+
+body {
+    background: var(--secondary-color);
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+}
+
+/* Header Styling */
+.admin-header {
+    background: var(--primary-color);
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-header .logo h1 {
+    font-size: 24px;
+}
+
+/* Navigation */
+nav ul {
+    list-style: none;
+    display: flex;
+}
+
+nav ul li {
+    margin-right: 15px;
+}
+
+nav ul li a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* Dashboard Content */
+.admin-content {
+    padding: 20px;
+}
+
+/* Table Styling */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th, td {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+
+th {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Footer */
+.admin-footer {
+    background: var(--primary-color);
+    color: white;
+    text-align: center;
+    padding: 10px;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}

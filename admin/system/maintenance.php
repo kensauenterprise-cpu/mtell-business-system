@@ -1,0 +1,270 @@
+<?php
+// =====================================
+// FILE: maintenance.php
+// LOCATION:
+// /infinity/admin/system/maintenance.php
+// =====================================
+
+// ==========================
+// 🔐 SESSION
+// ==========================
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// ==========================
+// 🔗 DATABASE
+// ==========================
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+// ==========================
+// ✅ DB CHECK
+// ==========================
+if (!isset($conn) || !$conn) {
+    die("Database connection missing");
+}
+
+// ==========================
+// 🔐 AUTH CHECK
+// ==========================
+if (!isset($_SESSION['user_id'])) {
+
+    header("Location: /infinity/admin/pages/login.php");
+    exit;
+}
+
+// ==========================
+// 🔐 ROLE CHECK
+// ONLY IT + SUPER ADMIN
+// ==========================
+$role = strtolower(
+    trim($_SESSION['role'] ?? '')
+);
+
+$allowed_roles = ['super_admin', 'it'];
+
+if (!in_array($role, $allowed_roles, true)) {
+
+    die("⛔ Access denied");
+}
+
+// ==========================
+// ✅ CREATE SETTINGS TABLE
+// ==========================
+$conn->query("
+CREATE TABLE IF NOT EXISTS settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(100) UNIQUE,
+    setting_value VARCHAR(100)
+)
+");
+
+// ==========================
+// ✅ INSERT DEFAULT ROW
+// ==========================
+$check = $conn->query("
+SELECT id
+FROM settings
+WHERE setting_key = 'maintenance_mode'
+LIMIT 1
+");
+
+if ($check && $check->num_rows == 0) {
+
+    $conn->query("
+    INSERT INTO settings (
+        setting_key,
+        setting_value
+    )
+    VALUES (
+        'maintenance_mode',
+        'off'
+    )
+    ");
+}
+
+// ==========================
+// 🔧 ENABLE MAINTENANCE
+// ==========================
+if (isset($_POST['enable'])) {
+
+    $conn->query("
+    UPDATE settings
+    SET setting_value = 'on'
+    WHERE setting_key = 'maintenance_mode'
+    ");
+}
+
+// ==========================
+// 🔧 DISABLE MAINTENANCE
+// ==========================
+if (isset($_POST['disable'])) {
+
+    $conn->query("
+    UPDATE settings
+    SET setting_value = 'off'
+    WHERE setting_key = 'maintenance_mode'
+    ");
+}
+
+// ==========================
+// 📥 GET STATUS
+// ==========================
+$status = 'off';
+
+$result = $conn->query("
+SELECT setting_value
+FROM settings
+WHERE setting_key = 'maintenance_mode'
+LIMIT 1
+");
+
+if ($result && $row = $result->fetch_assoc()) {
+
+    $status = strtolower(
+        trim($row['setting_value'] ?? 'off')
+    );
+}
+?>
+
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Maintenance Mode</title>
+
+<meta charset="utf-8">
+
+<style>
+
+body{
+    font-family:Arial;
+    background:#f1f5f9;
+    padding:20px;
+}
+
+.container{
+    max-width:700px;
+    margin:auto;
+    background:white;
+    padding:30px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+
+h2{
+    margin-top:0;
+}
+
+.status{
+    padding:15px;
+    border-radius:6px;
+    margin-bottom:20px;
+    font-weight:bold;
+}
+
+.on{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
+.off{
+    background:#dcfce7;
+    color:#166534;
+}
+
+button{
+    padding:12px 20px;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:16px;
+}
+
+.enable{
+    background:#dc2626;
+    color:white;
+}
+
+.disable{
+    background:#16a34a;
+    color:white;
+}
+
+.info{
+    margin-top:20px;
+    color:#475569;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>
+🛠 Maintenance Mode
+</h2>
+
+<?php if ($status === 'on'): ?>
+
+<div class="status on">
+
+    Current Status: ON
+    (System under maintenance)
+
+</div>
+
+<?php else: ?>
+
+<div class="status off">
+
+    Current Status: OFF
+    (System live)
+
+</div>
+
+<?php endif; ?>
+
+<form method="post">
+
+<?php if ($status === 'off'): ?>
+
+<button
+    type="submit"
+    name="enable"
+    class="enable"
+>
+    Enable Maintenance
+</button>
+
+<?php else: ?>
+
+<button
+    type="submit"
+    name="disable"
+    class="disable"
+>
+    Disable Maintenance
+</button>
+
+<?php endif; ?>
+
+</form>
+
+<p class="info">
+
+When maintenance is ON,
+only IT and Super Admin
+can access the system.
+
+</p>
+
+</div>
+
+</body>
+
+</html>

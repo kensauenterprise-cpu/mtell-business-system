@@ -1,0 +1,57 @@
+<?php
+// ==========================
+// SESSION SAFE START
+// ==========================
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// ==========================
+// DEFAULT BRANCH (GLOBAL FIX)
+// ==========================
+if (!isset($_SESSION['branch_id'])) {
+    $_SESSION['branch_id'] = 1; // default branch
+}
+
+// ==========================
+// USER ROLE (SAFE)
+// ==========================
+$role = strtolower($_SESSION['role'] ?? 'guest');
+
+// ==========================
+// HANDLE BRANCH SWITCH
+// ==========================
+if (isset($_GET['branch_id'])) {
+
+    if ($role === 'super_admin') {
+
+        // super admin can select ALL or specific branch
+        $_SESSION['branch_id'] = ($_GET['branch_id'] === 'all')
+            ? 'all'
+            : (int)$_GET['branch_id'];
+
+    } elseif ($role === 'admin') {
+
+        // admin can only select specific branch (no 'all')
+        $_SESSION['branch_id'] = (int)$_GET['branch_id'];
+    }
+}
+
+// ==========================
+// FINAL BRANCH VALUE (SAFE)
+// ==========================
+$branch_id = $_SESSION['branch_id'] ?? 1;
+
+// ==========================
+// OPTIONAL: SQL FILTER HELPER
+// ==========================
+// Use this in queries:
+// WHERE 1=1 $branch_filter
+// ==========================
+$branch_filter = '';
+
+if ($branch_id !== 'all') {
+    $branch_id = (int)$branch_id;
+    $branch_filter = " AND branch_id = $branch_id ";
+}
+?>

@@ -1,0 +1,76 @@
+<?php
+function getAccessToken($tokenPath = __DIR__ . '/../tokens/access_tohen.json') {
+    $consumerKey = 'yi0BntQvtOMZsqZ8yja32DKuIc1YzuAFIxbjEAuHmKhn1RBK';
+    $consumerSecret = 'R7K99p710eF35geSw8mM6I5f4GavUe7HUK8YTE2lNaijVDvvLRubgZjXLnnAEje4';
+    $tokenURL = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+
+    // ✅ Check if token file exists and is still valid
+    if (file_exists($tokenPath)) {
+        $tokenData = json_decode(file_get_contents($tokenPath), true);
+        if (!empty($tokenData['access_token']) && time() < $tokenData['expires_at']) {
+            return [
+                'status' => 'ok',
+                'message' => '✅ Token is valid',
+                'token' => $tokenData['access_token'],
+                'expires_at' => $tokenData['expires_at']
+            ];
+        }
+    }
+
+    // 🔁 Regenerate token
+    $credentials = base64_encode("$consumerKey:$consumerSecret");
+    $headers = ['Authorization: Basic ' . $credentials];
+
+    $curl = curl_init();
+    curl_setopt_array($curl, [
+        CURLOPT_URL => $tokenURL,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_RETURNTRANSFER => true
+    ]);
+
+    $response = curl_exec($curl);
+    curl_close($curl);
+
+    $result = json_decode($response, true);
+    if (!empty($result['access_token'])) {
+        $tokenData = [
+            'access_token' => $result['access_token'],
+            'expires_at' => time() + 3300 // ~55 minutes
+        ];
+
+        // 🛡️ Ensure directory exists and is writable
+        $tokenDir = dirname($tokenPath);
+        if (!is_dir($tokenDir)) {
+            mkdir($tokenDir, 0755, true);
+        }
+
+        if (is_writable($tokenDir)) {
+            file_put_contents($tokenPath, json_encode($tokenData));
+        } else {
+            error_log("⚠️ Token path not writable: $tokenPath");
+        }
+
+        // 📝 Optional: log regeneration event
+        $logPath = __DIR__ . '/../logs/token_regeneration.csv';
+        $logEntry = [
+            date('Y-m-d H:i:s'),
+            substr($result['access_token'], 0, 6) . '...', // Masked token
+            $tokenData['expires_at']
+        ];
+        $logLine = implode(',', $logEntry) . "\n";
+        file_put_contents($logPath, $logLine, FILE_APPEND);
+
+        return [
+            'status' => 'regenerated',
+            'message' => '✅ Token regenerated',
+            'token' => $result['access_token'],
+            'expires_at' => $tokenData['expires_at']
+        ];
+    }
+
+    return [
+        'status' => 'error',
+        'message' => '❌ Failed to generate token'
+    ];
+}
+?>
