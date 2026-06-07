@@ -1,175 +1,56 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
 
-// ==========================
-// 🔐 SESSION (SAFE)
-// ==========================
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// ==========================
-// ✅ DB CHECK
-// ==========================
 if (!isset($conn) || !$conn instanceof mysqli) {
     die("❌ Database connection failed");
 }
 
-// ==========================
-// 🏢 BRANCH
-// ==========================
 $branch_id = $_SESSION['branch_id'] ?? 1;
 
-// ==========================
-// 📦 INVENTORY STATS
-// ==========================
-$total_products     = 0;
-$total_stock        = 0;
-$low_stock          = 0;
-$out_of_stock       = 0;
-$total_stock_value  = 0;
-$total_purchases    = 0;
+$total_products = 0;
+$total_stock = 0;
+$low_stock = 0;
+$out_of_stock = 0;
+$total_stock_value = 0;
+$total_purchases = 0;
 
-// ==========================
-// 🌍 ALL BRANCHES
-// ==========================
 if ($branch_id === 'all') {
 
-    $result = $conn->query("SELECT COUNT(*) as total FROM products");
-    if ($result && $row = $result->fetch_assoc()) {
-        $total_products = (int)$row['total'];
-    }
+    $row = $conn->query("SELECT COUNT(*) total FROM products")->fetch_assoc();
+    $total_products = (int)$row['total'];
 
-    $result = $conn->query("SELECT SUM(stock) as total FROM products");
-    if ($result && $row = $result->fetch_assoc()) {
-        $total_stock = (float)($row['total'] ?? 0);
-    }
+    $row = $conn->query("SELECT COALESCE(SUM(stock),0) total FROM products")->fetch_assoc();
+    $total_stock = (int)$row['total'];
 
-    $result = $conn->query("
-        SELECT COUNT(*) as total
+    $row = $conn->query("
+        SELECT COUNT(*) total
         FROM products
-        WHERE stock <= 5
-        AND stock > 0
-    ");
-    if ($result && $row = $result->fetch_assoc()) {
-        $low_stock = (int)$row['total'];
-    }
+        WHERE stock <= 5 AND stock > 0
+    ")->fetch_assoc();
+    $low_stock = (int)$row['total'];
 
-    $result = $conn->query("
-        SELECT COUNT(*) as total
+    $row = $conn->query("
+        SELECT COUNT(*) total
         FROM products
         WHERE stock <= 0
-    ");
-    if ($result && $row = $result->fetch_assoc()) {
-        $out_of_stock = (int)$row['total'];
-    }
+    ")->fetch_assoc();
+    $out_of_stock = (int)$row['total'];
 
-    $result = $conn->query("
-        SELECT SUM(stock * cost_price) as total
+    $row = $conn->query("
+        SELECT COALESCE(SUM(stock * cost_price),0) total
         FROM products
-    ");
-    if ($result && $row = $result->fetch_assoc()) {
-        $total_stock_value = (float)($row['total'] ?? 0);
-    }
+    ")->fetch_assoc();
+    $total_stock_value = (float)$row['total'];
 
-    $result = $conn->query("
-        SELECT SUM(total_cost) as total
+    $row = $conn->query("
+        SELECT COALESCE(SUM(total_cost),0) total
         FROM purchases
-    ");
-    if ($result && $row = $result->fetch_assoc()) {
-        $total_purchases = (float)($row['total'] ?? 0);
-    }
-
-} else {
-
-    $branch_id = (int)$branch_id;
-
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) as total
-        FROM products
-        WHERE branch_id = ?
-    ");
-    $stmt->bind_param("i", $branch_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $total_products = (int)$row['total'];
-    }
-    $stmt->close();
-
-    $stmt = $conn->prepare("
-        SELECT SUM(stock) as total
-        FROM products
-        WHERE branch_id = ?
-    ");
-    $stmt->bind_param("i", $branch_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $total_stock = (float)($row['total'] ?? 0);
-    }
-    $stmt->close();
-
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) as total
-        FROM products
-        WHERE stock <= 5
-        AND stock > 0
-        AND branch_id = ?
-    ");
-    $stmt->bind_param("i", $branch_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $low_stock = (int)$row['total'];
-    }
-    $stmt->close();
-
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) as total
-        FROM products
-        WHERE stock <= 0
-        AND branch_id = ?
-    ");
-    $stmt->bind_param("i", $branch_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $out_of_stock = (int)$row['total'];
-    }
-    $stmt->close();
-
-    $stmt = $conn->prepare("
-        SELECT SUM(stock * cost_price) as total
-        FROM products
-        WHERE branch_id = ?
-    ");
-    $stmt->bind_param("i", $branch_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $total_stock_value = (float)($row['total'] ?? 0);
-    }
-    $stmt->close();
-
-    $stmt = $conn->prepare("
-        SELECT SUM(total_cost) as total
-        FROM purchases
-        WHERE branch_id = ?
-    ");
-    $stmt->bind_param("i", $branch_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $total_purchases = (float)($row['total'] ?? 0);
-    }
-    $stmt->close();
-}
-
-// ==========================
-// 📦 PRODUCTS LIST
-// ==========================
-if ($branch_id === 'all') {
+    ")->fetch_assoc();
+    $total_purchases = (float)$row['total'];
 
     $products = $conn->query("
         SELECT *
@@ -179,16 +60,79 @@ if ($branch_id === 'all') {
 
 } else {
 
+    $branch_id = (int)$branch_id;
+
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) total
+        FROM products
+        WHERE branch_id=?
+    ");
+    $stmt->bind_param("i",$branch_id);
+    $stmt->execute();
+    $total_products = (int)$stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+
+    $stmt = $conn->prepare("
+        SELECT COALESCE(SUM(stock),0) total
+        FROM products
+        WHERE branch_id=?
+    ");
+    $stmt->bind_param("i",$branch_id);
+    $stmt->execute();
+    $total_stock = (int)$stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) total
+        FROM products
+        WHERE stock <= 5
+        AND stock > 0
+        AND branch_id=?
+    ");
+    $stmt->bind_param("i",$branch_id);
+    $stmt->execute();
+    $low_stock = (int)$stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) total
+        FROM products
+        WHERE stock <= 0
+        AND branch_id=?
+    ");
+    $stmt->bind_param("i",$branch_id);
+    $stmt->execute();
+    $out_of_stock = (int)$stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+
+    $stmt = $conn->prepare("
+        SELECT COALESCE(SUM(stock * cost_price),0) total
+        FROM products
+        WHERE branch_id=?
+    ");
+    $stmt->bind_param("i",$branch_id);
+    $stmt->execute();
+    $total_stock_value = (float)$stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+
+    $stmt = $conn->prepare("
+        SELECT COALESCE(SUM(total_cost),0) total
+        FROM purchases
+        WHERE branch_id=?
+    ");
+    $stmt->bind_param("i",$branch_id);
+    $stmt->execute();
+    $total_purchases = (float)$stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+
     $stmt = $conn->prepare("
         SELECT *
         FROM products
-        WHERE branch_id = ?
+        WHERE branch_id=?
         ORDER BY stock ASC
     ");
-
-    $stmt->bind_param("i", $branch_id);
+    $stmt->bind_param("i",$branch_id);
     $stmt->execute();
-
     $products = $stmt->get_result();
 }
 ?>
@@ -219,12 +163,12 @@ if ($branch_id === 'all') {
 
     <div class="card">
         <h3>💰 Stock Value</h3>
-        <p>Ksh <?= number_format($total_stock_value, 2) ?></p>
+        <p>Ksh <?= number_format($total_stock_value,2) ?></p>
     </div>
 
     <div class="card">
         <h3>🧾 Purchases</h3>
-        <p>Ksh <?= number_format($total_purchases, 2) ?></p>
+        <p>Ksh <?= number_format($total_purchases,2) ?></p>
     </div>
 
 </div>
@@ -235,43 +179,68 @@ if ($branch_id === 'all') {
 
 <tr style="background:#f1f5f9;">
     <th>ID</th>
+    <th>Image</th>
     <th>Product</th>
     <th>Stock</th>
     <th>Cost Price</th>
-    <th>Selling Price</th>
+    <th>Retail Price</th>
+    <th>Wholesale Price</th>
+    <th>Online Price</th>
     <th>Stock Value</th>
     <th>Status</th>
-</tr>
+    </tr>
 
 <?php if ($products && $products->num_rows > 0): ?>
 
 <?php while($row = $products->fetch_assoc()): ?>
 
 <?php
-    $stock = (float)($row['stock'] ?? 0);
+$stock = (int)$row['stock'];
 
-    if ($stock <= 0) {
-        $status = "❌ Out of Stock";
-    } elseif ($stock <= 5) {
-        $status = "⚠ Low Stock";
-    } else {
-        $status = "✅ In Stock";
-    }
+$status =
+    $stock <= 0 ? '❌ Out of Stock' :
+    ($stock <= 5 ? '⚠ Low Stock' : '✅ In Stock');
 
-    $buying_price = (float)($row['cost_price'] ?? 0);
-    $selling_price = (float)($row['price'] ?? 0);
+$cost_price      = (float)$row['cost_price'];
+$retail_price    = (float)$row['retail_price'];
+$wholesale_price = (float)$row['wholesale_price'];
+$online_price    = (float)$row['online_price'];
+$stock_value = $stock * $cost_price;
 
-    $stock_value = $stock * $buying_price;
+$image = !empty($row['image'])
+    ? $row['image']
+    : 'default.png';
 ?>
 
 <tr>
+
     <td><?= $row['id'] ?></td>
-    <td><?= htmlspecialchars($row['name'] ?? 'N/A') ?></td>
+
+    <td>
+        <img
+            src="/infinity/uploads/<?= htmlspecialchars($image) ?>"
+            width="50"
+            height="50"
+            style="object-fit:cover;border-radius:5px;"
+        >
+    </td>
+
+    <td><?= htmlspecialchars($row['name']) ?></td>
+
     <td><?= number_format($stock) ?></td>
-    <td>Ksh <?= number_format($buying_price, 2) ?></td>
-    <td>Ksh <?= number_format($selling_price, 2) ?></td>
-    <td>Ksh <?= number_format($stock_value, 2) ?></td>
+
+    <td>Ksh <?= number_format($cost_price,2) ?></td>
+
+    <td>Ksh <?= number_format($retail_price,2) ?></td>
+
+    <td>Ksh <?= number_format($wholesale_price,2) ?></td>
+
+    <td>Ksh <?= number_format($online_price,2) ?></td>
+
+    <td>Ksh <?= number_format($stock_value,2) ?></td>
+
     <td><?= $status ?></td>
+
 </tr>
 
 <?php endwhile; ?>
@@ -279,7 +248,7 @@ if ($branch_id === 'all') {
 <?php else: ?>
 
 <tr>
-    <td colspan="7">No inventory records found.</td>
+    <td colspan="10">No inventory records found.</td>
 </tr>
 
 <?php endif; ?>

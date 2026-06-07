@@ -1,0 +1,72 @@
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+$message = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $name = trim($_POST['name']);
+    $category = trim($_POST['category']);
+    $description = trim($_POST['description']);
+    $price = (float)$_POST['price'];
+
+    $image_url = '';
+
+    if (!empty($_FILES['image']['name'])) {
+
+        $uploadDir = $_SERVER['DOCUMENT_ROOT'].'/infinity/uploads/products/';
+
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0777, true);
+        }
+
+        $fileName = time().'_'.basename($_FILES['image']['name']);
+
+        move_uploaded_file(
+            $_FILES['image']['tmp_name'],
+            $uploadDir.$fileName
+        );
+
+        $image_url = '/infinity/uploads/products/'.$fileName;
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO products
+        (name, category, description, price, image_url)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+
+    $stmt->bind_param(
+        "sssds",
+        $name,
+        $category,
+        $description,
+        $price,
+        $image_url
+    );
+
+    if ($stmt->execute()) {
+        $message = "Product added successfully.";
+    }
+}
+?>
+
+<h2>Add Product</h2>
+
+<?= $message ?>
+
+<form method="POST" enctype="multipart/form-data">
+
+    <input type="text" name="name" placeholder="Product Name" required><br><br>
+
+    <input type="text" name="category" placeholder="Category"><br><br>
+
+    <textarea name="description" placeholder="Description"></textarea><br><br>
+
+    <input type="number" step="0.01" name="price" placeholder="Price"><br><br>
+
+    <input type="file" name="image"><br><br>
+
+    <button type="submit">Save Product</button>
+
+</form>

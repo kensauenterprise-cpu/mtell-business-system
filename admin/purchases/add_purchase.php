@@ -1,96 +1,148 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
 
-if (!isset($conn) || !$conn) {
-    die("Database connection failed.");
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (!isset($conn) || !$conn instanceof mysqli) {
+    die("❌ Database connection failed");
 }
 
 // Products
 $products = $conn->query("
-    SELECT *
+    SELECT id, name
     FROM products
     ORDER BY name ASC
 ");
 
 // Suppliers
 $suppliers = $conn->query("
-    SELECT *
+    SELECT id, name
     FROM suppliers
     ORDER BY name ASC
 ");
 
-// Save Purchase
-if (isset($_POST['save'])) {
+// ==========================
+// SAVE PURCHASE
+// ==========================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $supplier_id  = (int)$_POST['supplier_id'];
-    $product_id   = (int)$_POST['product_id'];
-    $quantity     = (int)$_POST['quantity'];
-    $cost_price   = (float)$_POST['cost_price'];
-    $purchase_date = $_POST['purchase_date'];
+    $supplier_id   = (int)($_POST['supplier_id'] ?? 0);
+    $product_id    = (int)($_POST['product_id'] ?? 0);
+    $quantity      = (int)($_POST['quantity'] ?? 0);
+    $cost_price    = (float)($_POST['cost_price'] ?? 0);
+    $purchase_date = $_POST['purchase_date'] ?? date('Y-m-d');
 
-    $branch_id = $_SESSION['branch_id'] ?? 1;
+    if (
+        $supplier_id <= 0 ||
+        $product_id <= 0 ||
+        $quantity <= 0 ||
+        $cost_price <= 0
+    ) {
+        die("❌ Please fill all fields correctly.");
+    }
+
+    $branch_id = (int)($_SESSION['branch_id'] ?? 1);
     $created_by = $_SESSION['username'] ?? 'System';
 
     $total_cost = $quantity * $cost_price;
-
-    $stmt = $conn->prepare("
-        INSERT INTO purchases (
-            supplier_id,
-            product_id,
-            quantity,
-            cost_price,
-            total_cost,
-            purchase_date,
-            branch_id,
-            created_by,
-            total,
-            status
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-
     $status = 'Completed';
 
-    $stmt->bind_param(
-        "iiiddsisss",
-        $supplier_id,
-        $product_id,
-        $quantity,
-        $cost_price,
-        $total_cost,
-        $purchase_date,
-        $branch_id,
-        $created_by,
-        $total_cost,
-        $status
-    );
+    $conn->begin_transaction();
 
-    if (!$stmt->execute()) {
-        die("Purchase Error: " . $stmt->error);
+    try {
+
+        // ==========================
+        // INSERT PURCHASE
+        // ==========================
+        $stmt = $conn->prepare("
+            INSERT INTO purchases (
+                supplier_id,
+                product_id,
+                quantity,
+                cost_price,
+                total_cost,
+                purchase_date,
+                branch_id,
+                created_by,
+                total,
+                status
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+        ");
+
+        if (!$stmt) {
+            throw new Exception($conn->error);
+        }
+
+        $stmt->bind_param(
+            "iiiddsisss",
+            $supplier_id,
+            $product_id,
+            $quantity,
+            $cost_price,
+            $total_cost,
+            $purchase_date,
+            $branch_id,
+            $created_by,
+            $total_cost,
+            $status
+        );
+
+        if (!$stmt->execute()) {
+            throw new Exception($stmt->error);
+        }
+
+        // ==========================
+        // UPDATE PRODUCT STOCK
+        // ==========================
+        $update = $conn->prepare("
+            UPDATE products
+            SET
+                stock = stock + ?,
+                cost_price = ?,
+                cost = ?
+            WHERE id = ?
+        ");
+
+        if (!$update) {
+            throw new Exception($conn->error);
+        }
+
+        $update->bind_param(
+            "iddi",
+            $quantity,
+            $cost_price,
+            $cost_price,
+            $product_id
+        );
+
+        if (!$update->execute()) {
+            throw new Exception($update->error);
+        }
+
+        $conn->commit();
+
+        echo "
+        <script>
+            alert('✅ Purchase saved successfully');
+            window.location='?tab=purchases';
+        </script>";
+        exit;
+
+    } catch (Exception $e) {
+
+        $conn->rollback();
+
+        die(
+            '❌ Purchase Error: ' .
+            htmlspecialchars($e->getMessage())
+        );
     }
-
-    // Update Product Stock
-    $update = $conn->prepare("
-        UPDATE products
-        SET stock = stock + ?
-        WHERE id = ?
-    ");
-
-    $update->bind_param(
-        "ii",
-        $quantity,
-        $product_id
-    );
-
-    if (!$update->execute()) {
-        die("Stock Update Error: " . $update->error);
-    }
-
-    echo "<script>
-        alert('Purchase saved successfully.');
-        window.location.href='dashboard.php?tab=purchases';
-    </script>";
-    exit;
 }
 ?>
 
@@ -103,8 +155,8 @@ if (isset($_POST['save'])) {
         <option value="">Select Supplier</option>
 
         <?php while ($s = $suppliers->fetch_assoc()): ?>
-            <option value="<?= $s['id']; ?>">
-                <?= htmlspecialchars($s['name']); ?>
+            <option value="<?= $s['id'] ?>">
+                <?= htmlspecialchars($s['name']) ?>
             </option>
         <?php endwhile; ?>
 
@@ -117,8 +169,8 @@ if (isset($_POST['save'])) {
         <option value="">Select Product</option>
 
         <?php while ($p = $products->fetch_assoc()): ?>
-            <option value="<?= $p['id']; ?>">
-                <?= htmlspecialchars($p['name']); ?>
+            <option value="<?= $p['id'] ?>">
+                <?= htmlspecialchars($p['name']) ?>
             </option>
         <?php endwhile; ?>
 
@@ -140,8 +192,8 @@ if (isset($_POST['save'])) {
     <input
         type="number"
         step="0.01"
+        min="0.01"
         name="cost_price"
-        min="0"
         required
     >
 
@@ -151,14 +203,14 @@ if (isset($_POST['save'])) {
     <input
         type="date"
         name="purchase_date"
-        value="<?= date('Y-m-d'); ?>"
+        value="<?= date('Y-m-d') ?>"
         required
     >
 
     <br><br>
 
-    <button type="submit" name="save">
-        Save Purchase
+    <button type="submit">
+        💾 Save Purchase
     </button>
 
 </form>

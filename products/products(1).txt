@@ -60,77 +60,92 @@ if (isset($_POST['save_product'])) {
 
     $category_id = (int)($_POST['category_id'] ?? 0);
 
-    $imageName = $_POST['existing_image'] ?? 'default.png';
+  $retail_image    = $_POST['existing_retail_image'] ?? '';
+$wholesale_image = $_POST['existing_wholesale_image'] ?? '';
+$online_image    = $_POST['existing_online_image'] ?? '';
 
-    // ==========================
-    // 📸 IMAGE UPLOAD
-    // ==========================
-    if (!empty($_FILES['image']['name'])) {
+$targetDir = $_SERVER['DOCUMENT_ROOT'].'/infinity/uploads/';
 
-        $allowed = ['jpg','jpeg','png','webp'];
+if (!is_dir($targetDir)) {
+    mkdir($targetDir, 0777, true);
+}
 
-        $ext = strtolower(
-            pathinfo(
-                $_FILES['image']['name'],
-                PATHINFO_EXTENSION
-            )
-        );
+// Retail Image
+if (!empty($_FILES['retail_image']['name'])) {
 
-        if (in_array($ext, $allowed)) {
+    $ext = strtolower(pathinfo($_FILES['retail_image']['name'], PATHINFO_EXTENSION));
 
-            $targetDir = $_SERVER['DOCUMENT_ROOT'].'/infinity/uploads/';
+    $retail_image = time().'_retail_'.uniqid().'.'.$ext;
 
-            if (!is_dir($targetDir)) {
+    move_uploaded_file(
+        $_FILES['retail_image']['tmp_name'],
+        $targetDir.$retail_image
+    );
+}
 
-                mkdir($targetDir, 0777, true);
-            }
+// Wholesale Image
+if (!empty($_FILES['wholesale_image']['name'])) {
 
-            $imageName =
-                time().'_'.uniqid().'.'.$ext;
+    $ext = strtolower(pathinfo($_FILES['wholesale_image']['name'], PATHINFO_EXTENSION));
 
-            move_uploaded_file(
-                $_FILES['image']['tmp_name'],
-                $targetDir.$imageName
-            );
-        }
-    }
+    $wholesale_image = time().'_wholesale_'.uniqid().'.'.$ext;
 
+    move_uploaded_file(
+        $_FILES['wholesale_image']['tmp_name'],
+        $targetDir.$wholesale_image
+    );
+}
+
+// Online Image
+if (!empty($_FILES['online_image']['name'])) {
+
+    $ext = strtolower(pathinfo($_FILES['online_image']['name'], PATHINFO_EXTENSION));
+
+    $online_image = time().'_online_'.uniqid().'.'.$ext;
+
+    move_uploaded_file(
+        $_FILES['online_image']['tmp_name'],
+        $targetDir.$online_image
+    );
+}
     // ==========================
     // ✏️ UPDATE
     // ==========================
     if ($id) {
 
         $stmt = $conn->prepare("
-            UPDATE products
-            SET
-                name=?,
-                description=?,
-                retail_price=?,
-                wholesale_price=?,
-                online_price=?,
-                cost_price=?,
-                stock=?,
-                category_id=?,
-                image=?
-            WHERE id=? AND branch_id=?
-        ");
-
+    UPDATE products
+    SET
+        name=?,
+        description=?,
+        retail_price=?,
+        wholesale_price=?,
+        online_price=?,
+        cost_price=?,
+        stock=?,
+        category_id=?,
+        retail_image=?,
+        wholesale_image=?,
+        online_image=?
+    WHERE id=? AND branch_id=?
+");
         if ($stmt) {
            $stmt->bind_param(
-               "ssddddiisii",
-                $name,
-                $desc,
-                $retail,
-                $wholesale,
-                $online,
-                $cost,
-                $stock,
-                $category_id,
-                $imageName,
-                $id,
-                $branch_id
-           );
-
+    "ssddddiisssii",
+    $name,
+    $desc,
+    $retail,
+    $wholesale,
+    $online,
+    $cost,
+    $stock,
+    $category_id,
+    $retail_image,
+    $wholesale_image,
+    $online_image,
+    $id,
+    $branch_id
+);
             $stmt->execute();
 
             $stmt->close();
@@ -142,42 +157,45 @@ if (isset($_POST['save_product'])) {
         // ➕ INSERT
         // ==========================
         $stmt = $conn->prepare("
-            INSERT INTO products
-            (
-                name,
-                description,
-                retail_price,
-                wholesale_price,
-                online_price,
-                cost_price,
-                stock,
-                category_id,
-                image,
-                branch_id,
-                created_at
-            )
-            VALUES
-            (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
-            )
+          INSERT INTO products
+(
+    name,
+    description,
+    retail_price,
+    wholesale_price,
+    online_price,
+    cost_price,
+    stock,
+    category_id,
+    retail_image,
+    wholesale_image,
+    online_image,
+    branch_id,
+    created_at
+)
+VALUES
+(
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
+)
         ");
 
         if ($stmt) {
 
             $stmt->bind_param(
-                "ssddddiisi",
-                 $name,
-                 $desc,
-                 $retail,
-                 $wholesale,
-                 $online,
-                 $cost,
-                 $stock,
-                 $category_id,
-                 $imageName,
-                 $branch_id
-            );
-
+    "ssddddiisssi",
+    $name,
+    $desc,
+    $retail,
+    $wholesale,
+    $online,
+    $cost,
+    $stock,
+    $category_id,
+    $retail_image,
+    $wholesale_image,
+    $online_image,
+    $branch_id
+);
             $stmt->execute();
 
             $stmt->close();
@@ -477,10 +495,14 @@ Products (<?= strtoupper($mode) ?>)
         <?php endwhile; ?>
     </select>
 
-    <input
-        type="file"
-        name="image"
-    >
+    <label>Retail Image</label>
+<input type="file" name="retail_image">
+
+<label>Wholesale Image</label>
+<input type="file" name="wholesale_image">
+
+<label>Online Image</label>
+<input type="file" name="online_image">
 
     <button
         type="submit"
@@ -522,10 +544,29 @@ $margin = $selling_price > 0
 
 <div class="product-card">
 
-    <img
-        src="/infinity/uploads/<?= !empty($row['image']) ? $row['image'] : 'default.png' ?>"
-        width="120"
-    >
+   <?php
+
+if ($mode == 'retail' || $mode == 'supermarket') {
+    $productImage = !empty($row['retail_image'])
+        ? $row['retail_image']
+        : 'default.png';
+
+} elseif ($mode == 'wholesale') {
+    $productImage = !empty($row['wholesale_image'])
+        ? $row['wholesale_image']
+        : 'default.png';
+
+} else {
+    $productImage = !empty($row['online_image'])
+        ? $row['online_image']
+        : 'default.png';
+}
+?>
+
+<img
+    src="/infinity/uploads/<?= $productImage ?>"
+    width="120"
+>
 
     <h3><?= htmlspecialchars($row['name']) ?></h3>
 
