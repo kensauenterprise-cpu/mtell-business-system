@@ -383,13 +383,9 @@ $revenue = $revenueStmt
             Sale Type
         </option>
 
-        <option value="walk_in" <?= $sale_type=='walk_in' ? 'selected' : '' ?>>
-            Walk-in Sale
-        </option>
-
-        <option value="customer_collection" <?= $sale_type=='customer_collection' ? 'selected' : '' ?>>
-            Customer Collection
-        </option>
+        <option value="walk_in">Walk-in Sale</option>
+<option value="customer_collection">Customer Collection</option>
+<option value="online">Online Orders</option>
 
     </select>
 
@@ -452,16 +448,23 @@ $revenue = $revenueStmt
             <?= nl2br(htmlspecialchars($o['items_taken'] ?? '')) ?>
         </td>
 
-        <td>
+       <td>
+<?php
+switch($o['sale_type']) {
 
-            <?=
-                ($o['sale_type'] ?? '') === 'customer_collection'
-                ? 'Customer Collection'
-                : 'Walk-in Sale'
-            ?>
+    case 'online':
+        echo 'Online Orders';
+        break;
 
-        </td>
+    case 'customer_collection':
+        echo 'Customer Collection';
+        break;
 
+    default:
+        echo 'Walk-in Sale';
+}
+?>
+</td>
         <td>
             <b>
                 KES <?= number_format((float)($o['total_amount'] ?? 0), 2) ?>

@@ -47,90 +47,71 @@ if (isset($_POST['save_product'])) {
     $name       = trim($_POST['name'] ?? '');
 
     $desc       = trim($_POST['description'] ?? '');
-
     $retail     = (float) ($_POST['retail_price'] ?? 0);
-
     $wholesale  = (float) ($_POST['wholesale_price'] ?? 0);
-
     $online     = (float) ($_POST['online_price'] ?? 0);
 
     $cost       = (float) ($_POST['cost_price'] ?? 0);
-
     $stock      = (int) ($_POST['stock'] ?? 0);
 
     $category_id = (int)($_POST['category_id'] ?? 0);
 
-    $imageName = $_POST['existing_image'] ?? 'default.png';
+$online_image    = $_POST['existing_online_image'] ?? '';
 
-    // ==========================
-    // 📸 IMAGE UPLOAD
-    // ==========================
-    if (!empty($_FILES['image']['name'])) {
+$targetDir = $_SERVER['DOCUMENT_ROOT'].'/infinity/uploads/';
 
-        $allowed = ['jpg','jpeg','png','webp'];
+if (!is_dir($targetDir)) {
+    mkdir($targetDir, 0777, true);
+}
 
-        $ext = strtolower(
-            pathinfo(
-                $_FILES['image']['name'],
-                PATHINFO_EXTENSION
-            )
-        );
 
-        if (in_array($ext, $allowed)) {
 
-            $targetDir = $_SERVER['DOCUMENT_ROOT'].'/infinity/uploads/';
+// Online Image
+if (!empty($_FILES['online_image']['name'])) {
 
-            if (!is_dir($targetDir)) {
+    $ext = strtolower(pathinfo($_FILES['online_image']['name'], PATHINFO_EXTENSION));
 
-                mkdir($targetDir, 0777, true);
-            }
+    $online_image = time().'_online_'.uniqid().'.'.$ext;
 
-            $imageName =
-                time().'_'.uniqid().'.'.$ext;
-
-            move_uploaded_file(
-                $_FILES['image']['tmp_name'],
-                $targetDir.$imageName
-            );
-        }
-    }
-
+    move_uploaded_file(
+        $_FILES['online_image']['tmp_name'],
+        $targetDir.$online_image
+    );
+}
     // ==========================
     // ✏️ UPDATE
     // ==========================
     if ($id) {
 
         $stmt = $conn->prepare("
-            UPDATE products
-            SET
-                name=?,
-                description=?,
-                retail_price=?,
-                wholesale_price=?,
-                online_price=?,
-                cost_price=?,
-                stock=?,
-                category_id=?,
-                image=?
-            WHERE id=? AND branch_id=?
-        ");
-
+    UPDATE products
+    SET
+        name=?,
+        description=?,
+        retail_price=?,
+        wholesale_price=?,
+        online_price=?,
+        cost_price=?,
+        stock=?,
+        category_id=?,
+        online_image=?
+    WHERE id=? AND branch_id=?
+");
         if ($stmt) {
            $stmt->bind_param(
-               "ssddddiisii",
-                $name,
-                $desc,
-                $retail,
-                $wholesale,
-                $online,
-                $cost,
-                $stock,
-                $category_id,
-                $imageName,
-                $id,
-                $branch_id
-           );
-
+    "ssddddiisii",
+    $name,
+    $desc,
+    $retail,
+    $wholesale,
+    $online,
+    $cost,
+    $stock,
+    $category_id,
+    $online_image,
+    $id,
+    $branch_id
+);
             $stmt->execute();
 
             $stmt->close();
@@ -142,49 +123,47 @@ if (isset($_POST['save_product'])) {
         // ➕ INSERT
         // ==========================
         $stmt = $conn->prepare("
-            INSERT INTO products
-            (
-                name,
-                description,
-                retail_price,
-                wholesale_price,
-                online_price,
-                cost_price,
-                stock,
-                category_id,
-                image,
-                branch_id,
-                created_at
-            )
-            VALUES
-            (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
-            )
+INSERT INTO products
+(
+    name,
+    description,
+    retail_price,
+    wholesale_price,
+    online_price,
+    cost_price,
+    stock,
+    category_id,
+    online_image,
+    branch_id,
+    created_at
+)
+VALUES
+(
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
+)
         ");
 
         if ($stmt) {
 
             $stmt->bind_param(
-                "ssddddiisi",
-                 $name,
-                 $desc,
-                 $retail,
-                 $wholesale,
-                 $online,
-                 $cost,
-                 $stock,
-                 $category_id,
-                 $imageName,
-                 $branch_id
-            );
-
+    "ssddddiisi",
+    $name,
+    $desc,
+    $retail,
+    $wholesale,
+    $online,
+    $cost,
+    $stock,
+    $category_id,
+    $online_image,
+    $branch_id
+);
             $stmt->execute();
 
             $stmt->close();
         }
     }
-
-    header("Location: ?tab=products&mode=".$mode);
+header("Location: ?tab=products&mode=".$mode."&updated=1");
 
     exit;
 }
@@ -404,95 +383,133 @@ Products (<?= strtoupper($mode) ?>)
 
 <hr>
 
-<h3>Add Product</h3>
+<?php
+
+$editProduct = null;
+
+if (isset($_GET['edit_id'])) {
+
+    $edit_id = (int)$_GET['edit_id'];
+
+    $stmt = $conn->prepare("
+        SELECT *
+        FROM products
+        WHERE id=? AND branch_id=?
+    ");
+
+    $stmt->bind_param("ii", $edit_id, $branch_id);
+
+    $stmt->execute();
+
+    $editProduct = $stmt->get_result()->fetch_assoc();
+
+    $stmt->close();
+}
+?>
+
+<h3>
+<?= $editProduct ? 'Edit Product' : 'Add Product' ?>
+</h3>
 
 <hr>
+
 <form method="POST" enctype="multipart/form-data" class="product-form">
 
-    <input
-        type="text"
-        name="name"
-        placeholder="Product Name"
-        required
-    >
+<input type="hidden"
+       name="id"
+       value="<?= $editProduct['id'] ?? '' ?>">
 
-    <textarea
-        name="description"
-        placeholder="Description"
-    ></textarea>
+<input type="hidden"
+       name="existing_online_image"
+       value="<?= $editProduct['online_image'] ?? '' ?>">
 
-    <input
-        type="number"
-        step="0.01"
-        name="retail_price"
-        placeholder="Retail Price"
-        required
-    >
+<input type="text"
+       name="name"
+       placeholder="Product Name"
+       value="<?= htmlspecialchars($editProduct['name'] ?? '') ?>"
+       required>
 
-    <input
-        type="number"
-        step="0.01"
-        name="wholesale_price"
-        placeholder="Wholesale Price"
-        required
-    >
+<textarea name="description"
+          placeholder="Description"><?= htmlspecialchars($editProduct['description'] ?? '') ?></textarea>
 
-    <input
-        type="number"
-        step="0.01"
-        name="online_price"
-        placeholder="Online Price"
-        required
-    >
+<input type="number"
+       step="0.01"
+       name="retail_price"
+       value="<?= $editProduct['retail_price'] ?? '' ?>"
+       placeholder="Retail Price"
+       required>
 
-    <input
-        type="number"
-        step="0.01"
-        name="cost_price"
-        placeholder="Cost Price"
-        required
-    >
+<input type="number"
+       step="0.01"
+       name="wholesale_price"
+       value="<?= $editProduct['wholesale_price'] ?? '' ?>"
+       placeholder="Wholesale Price"
+       required>
 
-    <input
-        type="number"
-        name="stock"
-        placeholder="Stock"
-        required
-    >
+<input type="number"
+       step="0.01"
+       name="online_price"
+       value="<?= $editProduct['online_price'] ?? '' ?>"
+       placeholder="Online Price"
+       required>
 
-    <select name="category_id" required>
-        <option value="">Select Category</option>
+<input type="number"
+       step="0.01"
+       name="cost_price"
+       value="<?= $editProduct['cost_price'] ?? '' ?>"
+       placeholder="Cost Price"
+       required>
 
-        <?php
-        $cats2 = mysqli_query(
-            $conn,
-            "SELECT id,name FROM categories ORDER BY name"
-        );
+<input type="number"
+       name="stock"
+       value="<?= $editProduct['stock'] ?? '' ?>"
+       placeholder="Stock"
+       required>
 
-        while($cat2 = mysqli_fetch_assoc($cats2)):
-        ?>
-            <option value="<?= $cat2['id']; ?>">
-                <?= htmlspecialchars($cat2['name']); ?>
-            </option>
-        <?php endwhile; ?>
-    </select>
+<select name="category_id" required>
 
-    <input
-        type="file"
-        name="image"
-    >
+    <option value="">Select Category</option>
 
-    <button
-        type="submit"
-        name="save_product"
-    >
-        Save Product
-    </button>
+    <?php
+    $cats2 = mysqli_query(
+        $conn,
+        "SELECT id,name FROM categories ORDER BY name"
+    );
+
+    while($cat2 = mysqli_fetch_assoc($cats2)):
+    ?>
+
+    <option value="<?= $cat2['id']; ?>"
+        <?= (($editProduct['category_id'] ?? 0) == $cat2['id']) ? 'selected' : '' ?>>
+        <?= htmlspecialchars($cat2['name']); ?>
+    </option>
+
+    <?php endwhile; ?>
+
+</select>
+
+<label>Online Image</label>
+<input type="file" name="online_image">
+
+<?php if(!empty($editProduct['online_image'])): ?>
+    <img
+        src="/infinity/uploads/<?= $editProduct['online_image'] ?>"
+        width="80">
+<?php endif; ?>
+
+<button type="submit" name="save_product">
+
+    <?= $editProduct ? 'Update Product' : 'Save Product' ?>
+
+</button>
+
 
 </form>
 
 <hr>
+
 <div class="product-grid">
+
 
 <?php while($row = $result->fetch_assoc()): ?>
 
@@ -522,10 +539,17 @@ $margin = $selling_price > 0
 
 <div class="product-card">
 
-    <img
-        src="/infinity/uploads/<?= !empty($row['image']) ? $row['image'] : 'default.png' ?>"
-        width="120"
-    >
+   <?php
+
+$productImage = !empty($row['online_image'])
+    ? $row['online_image']
+    : 'default.png';
+?>
+
+<img
+    src="/infinity/uploads/<?= $productImage ?>"
+    width="120"
+>
 
     <h3><?= htmlspecialchars($row['name']) ?></h3>
 
@@ -568,7 +592,17 @@ $margin = $selling_price > 0
             <?= $row['stock'] ?>
         </span>
     </p>
+<form method="GET" style="display:inline;">
 
+    <input type="hidden" name="tab" value="products">
+    <input type="hidden" name="mode" value="<?= htmlspecialchars($mode) ?>">
+    <input type="hidden" name="edit_id" value="<?= $row['id'] ?>">
+
+    <button type="submit">
+        Edit Product
+    </button>
+
+</form>
     <!-- DELETE -->
     <form method="POST" style="display:inline;">
         <input

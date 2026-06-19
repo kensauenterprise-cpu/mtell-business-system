@@ -1,0 +1,33 @@
+<?php
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+$data = file_get_contents('php://input');
+
+file_put_contents(
+    __DIR__.'/callback_log.txt',
+    $data.PHP_EOL,
+    FILE_APPEND
+);
+
+$response = json_decode($data, true);
+
+$resultCode =
+$response['Body']['stkCallback']['ResultCode'] ?? 1;
+
+if($resultCode == 0){
+
+    /*
+    Create order
+    Create order_items
+    Update stock
+    Set payment_status='paid'
+    */
+}
+
+http_response_code(200);
+
+echo json_encode([
+    'ResultCode' => 0,
+    'ResultDesc' => 'Accepted'
+]);

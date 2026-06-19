@@ -124,6 +124,16 @@ font-weight:bold;
 cursor:pointer;
 }
 
+.checkout-login-btn{
+    display:inline-block;
+    padding:12px 22px;
+    background:#28a745;
+    color:white;
+    text-decoration:none;
+    border-radius:6px;
+    font-weight:bold;
+}
+
 input[type="number"]{
 width:60px;
 }
@@ -231,17 +241,29 @@ Ksh <?php echo number_format($total,2); ?>
 
 <div class="checkout-button">
 
-<form action="/infinity/checkout/checkout.php" method="POST">
+<?php if(isset($_SESSION['customer_id'])): ?>
 
-<input type="hidden" name="amount" value="<?php echo $total; ?>">
+<form action="/infinity/checkout.php" method="POST">
 
-<button type="submit">
+    <input
+    type="hidden"
+    name="amount"
+    value="<?php echo $total; ?>"
+    >
 
-🧾 Proceed to Checkout
-
-</button>
+    <button type="submit">
+        🧾 Proceed to Checkout
+    </button>
 
 </form>
+
+<?php else: ?>
+
+<a href="/infinity/customer_login.php" class="checkout-login-btn">
+    🔐 Login To Checkout
+</a>
+
+<?php endif; ?>
 
 </div>
 

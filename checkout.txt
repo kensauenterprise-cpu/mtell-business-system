@@ -1,0 +1,152 @@
+<?php
+session_start();
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+if (!isset($_SESSION['customer_id'])) {
+    header("Location: customer_login.php");
+    exit;
+}
+
+if (empty($_SESSION['cart'])) {
+    die("Cart is empty");
+}
+
+$total = 0;
+
+foreach ($_SESSION['cart'] as $item) {
+    $total += $item['price'] * $item['quantity'];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+$phone = '254' . trim($_POST['phone'] ?? '');
+$address = trim($_POST['address'] ?? '');
+
+if (!preg_match('/^2547\d{8}$/', $phone)) {
+    die("Invalid phone number");
+}
+
+if (empty($address)) {
+    die("Delivery address is required");
+}
+
+    $_SESSION['checkout'] = [
+        'customer_id'   => $_SESSION['customer_id'],
+        'customer_name' => $_SESSION['customer_name'],
+        'phone'         => $phone,
+        'address'       => $address,
+        'amount'        => $total
+    ];
+
+    header("Location: /infinity/payments/stk_push.php");
+    exit;
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Checkout</title>
+
+<style>
+body{
+    font-family:Arial,sans-serif;
+    max-width:600px;
+    margin:40px auto;
+}
+
+input,select{
+    width:100%;
+    padding:10px;
+    margin-bottom:15px;
+}
+
+button{
+    background:#28a745;
+    color:white;
+    border:none;
+    padding:12px 20px;
+    cursor:pointer;
+    border-radius:5px;
+}
+
+.total{
+    font-size:20px;
+    font-weight:bold;
+    color:#28a745;
+    margin-bottom:20px;
+}
+</style>
+
+</head>
+<body>
+
+<h2>Checkout</h2>
+
+<div class="total">
+Total: KES <?= number_format($total,2) ?>
+</div>
+
+<form method="POST" action="">
+
+<label>Phone Number</label>
+
+
+<div style="display:flex;align-items:center;">
+    <span style="
+        padding:10px;
+        background:#eee;
+        border:1px solid #ccc;
+        border-right:none;
+    ">254</span>
+
+    <input
+        type="tel"
+        name="phone"
+        placeholder="711931632"
+        maxlength="9"
+        pattern="[0-9]{9}"
+        required
+        style="flex:1;"
+    >
+</div>
+<label>Select Town For Delivery</label>
+
+<select name="address" required>
+
+<option value="">-- Select Town For Delivery --</option>
+
+<option value="Nairobi">Nairobi</option>
+<option value="Mombasa">Mombasa</option>
+<option value="Kisumu">Kisumu</option>
+<option value="Nakuru">Nakuru</option>
+<option value="Eldoret">Uasin Gishu (Eldoret)</option>
+<option value="Narok">Narok</option>
+<option value="Nyeri">Nyeri</option>
+<option value="Machakos">Machakos</option>
+<option value="Kitui">Kitui</option>
+<option value="Kakamega">Kakamega</option>
+<option value="Garissa">Garissa</option>
+<option value="Isiolo">Isiolo</option>
+<option value="Meru">Meru</option>
+<option value="Embu">Embu</option>
+<option value="Kericho">Kericho</option>
+<option value="Bomet">Bomet</option>
+<option value="Kisii">Kisii</option>
+<option value="Migori">Migori</option>
+<option value="Homa Bay">Homa Bay</option>
+<option value="Bungoma">Bungoma</option>
+
+</select>
+
+<button type="submit">
+Pay With M-Pesa
+</button>
+
+</form>
+
+</body>
+</html>

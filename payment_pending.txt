@@ -1,0 +1,18 @@
+<?php
+session_start();
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Awaiting Payment</title>
+</head>
+<body>
+
+<h2>⏳ Awaiting Payment</h2>
+
+<p>Please complete the M-Pesa prompt on your phone.</p>
+
+<p>Do not close this page until payment is completed.</p>
+
+</body>
+</html>

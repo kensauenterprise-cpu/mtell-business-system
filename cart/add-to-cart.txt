@@ -16,7 +16,15 @@ if (!isset($_POST['product_id'])) {
 $product_id = intval($_POST['product_id']);
 
 // ✅ Fetch product (NO stock check)
-$stmt = $conn->prepare("SELECT id, name, price, image FROM products WHERE id=?");
+$stmt = $conn->prepare("
+SELECT
+    id,
+    name,
+    online_price,
+    online_image
+FROM products
+WHERE id=?
+");
 $stmt->bind_param("i", $product_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -38,14 +46,19 @@ if (!isset($_SESSION['cart'])) {
 $pid = $product['id'];
 
 // ✅ Add to cart (NO stock restriction)
+$qty = max(1, intval($_POST['quantity'] ?? 1));
+
 if (isset($_SESSION['cart'][$pid])) {
-    $_SESSION['cart'][$pid]['quantity']++;
+
+    $_SESSION['cart'][$pid]['quantity'] = $qty;
+
 } else {
+
     $_SESSION['cart'][$pid] = [
         "name" => $product['name'],
-        "price" => $product['price'],
-        "image" => $product['image'],
-        "quantity" => 1
+        "price" => $product['online_price'],
+        "image" => $product['online_image'],
+        "quantity" => $qty
     ];
 }
 

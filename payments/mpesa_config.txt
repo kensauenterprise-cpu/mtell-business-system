@@ -1,0 +1,10 @@
+<?php
+
+$consumerKey    = "yi0BntQvtOMZsqZ8yja32DKuIc1YzuAFIxbjEAuHmKhn1RBK";
+$consumerSecret = "R7K99p710eF35geSw8mM6I5f4GavUe7HUK8YTE2lNaijVDvvLRubgZjXLnnAEje4";
+
+$shortCode      = "5669370";
+
+$passkey        = "2429a34d7dda868350e07cf1afbaaa309f9b5638de29d142bfe2fb6065c61545";
+
+$callbackUrl    = "https://mtell.kesug.com/infinity/payments/mpesa_callback.php";

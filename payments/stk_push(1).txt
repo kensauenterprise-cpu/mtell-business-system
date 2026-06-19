@@ -146,16 +146,30 @@ if (!$stkResponse) {
 }
 
 $responseData = json_decode($stkResponse, true);
-echo "<pre>";
-print_r($responseData);
-echo "</pre>";
-exit;
+file_put_contents(
+    __DIR__.'/stk_response.txt',
+    print_r($responseData, true),
+    FILE_APPEND
+);
+file_put_contents(
+    __DIR__ . '/stk_response.txt',
+    print_r($responseData, true) . PHP_EOL . PHP_EOL,
+    FILE_APPEND
+);
+
 
 // ==========================
 // SAVE CHECKOUT REQUEST ID
 // ==========================
 $checkout_id = $responseData['CheckoutRequestID'] ?? null;
 $merchant_id = $responseData['MerchantRequestID'] ?? null;
+file_put_contents(
+    __DIR__.'/debug.txt',
+    "Pending ID: ".$pending_id.
+    "\nCheckout: ".$checkout_id.
+    "\nMerchant: ".$merchant_id."\n\n",
+    FILE_APPEND
+);
 
 if ($checkout_id) {
 
