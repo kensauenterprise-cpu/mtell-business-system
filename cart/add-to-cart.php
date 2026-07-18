@@ -1,0 +1,79 @@
+<?php
+session_start();
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
+
+// Validate product_id (accept both POST and GET)
+
+if (isset($_POST['product_id'])) {
+
+    $product_id = (int)$_POST['product_id'];
+
+} elseif (isset($_GET['id'])) {
+
+    $product_id = (int)$_GET['id'];
+
+} else {
+
+    $_SESSION['message'] = "Invalid product.";
+    header("Location: /index.php");
+    exit();
+
+}
+// ? Fetch product (NO stock check)
+$stmt = $conn->prepare("
+SELECT
+    id,
+    name,
+    online_price,
+    online_image
+FROM products
+WHERE id=?
+");
+$stmt->bind_param("i", $product_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+// ? Product not found
+if ($result->num_rows == 0) {
+    $_SESSION['message'] = "Product not found.";
+    header("Location: /index.php");
+    exit();
+}
+
+$product = $result->fetch_assoc();
+
+// ? Initialize cart if not exists
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
+$pid = $product['id'];
+
+// ? Add to cart (NO stock restriction)
+$qty = max(1, (int)($_POST['quantity'] ?? $_GET['quantity'] ?? 1));
+
+if (isset($_SESSION['cart'][$pid])) {
+
+    $_SESSION['cart'][$pid]['quantity'] = $qty;
+
+} else {
+
+    $_SESSION['cart'][$pid] = [
+        "name" => $product['name'],
+        "price" => $product['online_price'],
+        "image" => $product['online_image'],
+        "quantity" => $qty
+    ];
+}
+
+// ? Success message
+$_SESSION['message'] = $product['name'] . " added to cart";
+
+// ? Redirect ALWAYS works
+header("Location: /infinity/cart/cart.php");
+exit();
+?>

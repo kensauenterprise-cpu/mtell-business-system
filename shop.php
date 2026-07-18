@@ -1,203 +1,420 @@
 <?php
 session_start();
+
 require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
 
-$base = "/infinity/";
+$base="/infinity/";
 
-// ==========================
-// 🛒 CART
-// ==========================
-if (!isset($_SESSION['cart'])) $_SESSION['cart'] = [];
-$cartCount = array_sum(array_column($_SESSION['cart'], 'quantity'));
-
-// ==========================
-// 🔍 FILTERS
-// ==========================
-$search = $_GET['search'] ?? '';
-$category = $_GET['category'] ?? '';
-$category_id = (int)($_GET['category_id'] ?? 0);
-$min_price = $_GET['min_price'] ?? '';
-$max_price = $_GET['max_price'] ?? '';
-$sort = $_GET['sort'] ?? '';
-
-// ==========================
-// 📄 PAGINATION
-// ==========================
-$page = max(1, (int)($_GET['page'] ?? 1));
-$limit = 12;
-$offset = ($page - 1) * $limit;
-
-// ==========================
-// 🧠 BASE QUERY
-// ==========================
-$baseSql = "
-FROM products p
-JOIN branch_stock bs ON p.id = bs.product_id
-WHERE bs.branch_id = 1
-AND bs.stock > 0
-AND p.online_price > 0
-";
-
-// FILTERS
-if($search){
-    $baseSql .= " AND p.name LIKE '%".$conn->real_escape_string($search)."%'";
+// ===============================
+// CART
+// ===============================
+if(!isset($_SESSION['cart'])){
+    $_SESSION['cart']=[];
 }
 
-if($category_id > 0){
+$cartCount=0;
 
-    $baseSql .= " AND p.category_id = ".$category_id;
-
-}
-elseif($category){
-
-    $baseSql .= " AND p.category = '".$conn->real_escape_string($category)."'";
-
+foreach($_SESSION['cart'] as $item){
+    $cartCount += $item['quantity'];
 }
 
-if($min_price){
-    $baseSql .= " AND p.online_price >= ".(float)$min_price;
-}
-
-if($max_price){
-    $baseSql .= " AND p.online_price <= ".(float)$max_price;
-}
-
-
-
-// ==========================
-// 🔽 SORTING
-// ==========================
-$orderBy = "p.id DESC";
-
-if($sort == 'price_asc') $orderBy = "p.online_price ASC";
-if($sort == 'price_desc') $orderBy = "p.online_price DESC";
-
-// ==========================
-// 📊 COUNT TOTAL
-// ==========================
-$countRes = $conn->query("SELECT COUNT(*) as total $baseSql");
-$totalRows = $countRes->fetch_assoc()['total'];
-$totalPages = ceil($totalRows / $limit);
-
-// ==========================
-// 📦 FINAL QUERY
-// ==========================
-$sql = "SELECT p.*, bs.stock $baseSql ORDER BY $orderBy LIMIT $limit OFFSET $offset";
-$res = $conn->query($sql);
-
-// ==========================
-// 📂 CATEGORIES
-// ==========================
-$cats = $conn->query("
-    SELECT id, name
-    FROM categories
-    ORDER BY name
+// ===============================
+// GET ALL CATEGORIES
+// ===============================
+$categories=$conn->query("
+SELECT id,name
+FROM categories
+ORDER BY name
 ");
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-<title>Shop - Mtell Kenya|Online Shop</title>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+
+<title>
+Mtell Kenya | Shop Online
+</title>
 
 <style>
 
-:root {
-    --primary: #1e293b;
-    --secondary: #334155;
-    --accent: #f59e0b;
-    --dark: #0f172a;
-    --light: #f8fafc;
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
 }
 
-body {
-    font-family: Arial;
-    background: var(--light);
-    margin: 0;
+body{
+
+font-family:'Segoe UI',Arial,sans-serif;
+background:#f5f7fa;
+color:#222;
+
 }
 
-.nav {
-    background: var(--primary);
-    padding: 15px 30px;
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+a{
+text-decoration:none;
 }
 
-.nav a {
-    color: white;
-    text-decoration: none;
-    margin: 0 10px;
-    font-weight: bold;
+img{
+max-width:100%;
+display:block;
 }
 
-.container {
-    display: flex;
+/* ===========================
+NAVBAR
+=========================== */
+
+.navbar{
+
+background:#1565c0;
+padding:15px 40px;
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+position:sticky;
+
+top:0;
+
+z-index:999;
+
 }
 
-.sidebar {
-    width: 250px;
-    background: white;
-    padding: 20px;
-    border-right: 1px solid #ddd;
+.logo{
+
+font-size:28px;
+
+font-weight:bold;
+
+color:#fff;
+
 }
 
-.content {
-    flex: 1;
-    padding: 20px;
+.nav-links{
+
+display:flex;
+
+gap:25px;
+
+align-items:center;
+
 }
 
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-    gap: 20px;
+.nav-links a{
+
+color:#fff;
+
+font-size:16px;
+
+font-weight:600;
+
 }
 
-.card {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,.1);
-    text-align: center;
+.nav-links a:hover{
+
+color:#ffd54f;
+
 }
 
-.card img {
-    width: 100%;
-    height: 120px;
-    object-fit: contain;
+.cart{
+
+background:#ff9800;
+
+padding:10px 18px;
+
+border-radius:30px;
+
+color:white;
+
+font-weight:bold;
+
+}
+
+/* ===========================
+PAGE TITLE
+=========================== */
+
+.page-header{
+
+background:#fff;
+
+padding:35px;
+
+text-align:center;
+
+margin-bottom:30px;
+
+box-shadow:0 2px 10px rgba(0,0,0,.08);
+
+}
+
+.page-header h1{
+
+font-size:42px;
+
+margin-bottom:10px;
+
+}
+
+.page-header p{
+
+font-size:18px;
+
+color:#666;
+
+}
+
+/* ===========================
+CATEGORY
+=========================== */
+
+.category-title{
+
+font-size:30px;
+
+margin:50px 40px 20px;
+
+padding-left:15px;
+
+border-left:6px solid #1565c0;
+
+color:#1565c0;
+
+font-weight:bold;
+
+}
+
+/* ===========================
+PRODUCT GRID
+=========================== */
+
+.products{
+
+display:grid;
+
+grid-template-columns:
+repeat(auto-fill,minmax(240px,1fr));
+
+gap:25px;
+
+padding:0 40px 40px;
+
+}
+
+/* ===========================
+CARD
+=========================== */
+
+.card{
+
+background:#fff;
+
+border-radius:15px;
+
+overflow:hidden;
+
+box-shadow:0 5px 20px rgba(0,0,0,.08);
+
+transition:.3s;
+
+position:relative;
+
+}
+
+.card:hover{
+
+transform:translateY(-8px);
+
+box-shadow:0 15px 30px rgba(0,0,0,.15);
+
+}
+
+.badge{
+
+position:absolute;
+
+top:15px;
+
+left:15px;
+
+background:#ff3b30;
+
+color:#fff;
+
+padding:6px 12px;
+
+border-radius:20px;
+
+font-size:12px;
+
+font-weight:bold;
+
+}
+
+.card img{
+
+height:220px;
+
+width:100%;
+
+object-fit:contain;
+
+padding:20px;
+
+background:#fff;
+
+}
+
+.card-body{
+
+padding:20px;
+
+}
+
+.card-body h3{
+
+font-size:20px;
+
+height:55px;
+
+margin-bottom:10px;
+
+}
+
+.price{
+
+font-size:28px;
+
+font-weight:bold;
+
+color:#1565c0;
+
+margin:15px 0;
+
+}
+
+.stock{
+
+color:#16a34a;
+
+font-weight:600;
+
+margin-bottom:15px;
+
+}
+
+.btn{
+
+display:block;
+
+width:100%;
+
+padding:12px;
+
+border:none;
+
+border-radius:8px;
+
+font-size:16px;
+
+font-weight:600;
+
+cursor:pointer;
+
+margin-top:10px;
+
 }
 
 .view-btn{
-    display:block;
-    background:#2563eb;
-    color:white;
-    text-decoration:none;
-    padding:10px;
-    border-radius:5px;
-    margin:10px 0;
+
+background:#1565c0;
+
+color:#fff;
+
 }
 
-input,
-select {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 10px;
+.cart-btn{
+
+background:#ff9800;
+
+color:#fff;
+
 }
 
-button {
-    padding: 10px;
-    width: 100%;
-    cursor: pointer;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 5px;
+.view-btn:hover{
+
+background:#0d47a1;
+
 }
 
-.pagination button {
-    width: auto;
-    margin: 5px;
+.cart-btn:hover{
+
+background:#f57c00;
+
+}
+
+/* ===========================
+FOOTER
+=========================== */
+
+footer{
+
+background:#1f2937;
+
+color:white;
+
+text-align:center;
+
+padding:35px;
+
+margin-top:50px;
+
+}
+
+/* ===========================
+RESPONSIVE
+=========================== */
+
+@media(max-width:768px){
+
+.navbar{
+
+flex-direction:column;
+
+gap:15px;
+
+}
+
+.nav-links{
+
+flex-wrap:wrap;
+
+justify-content:center;
+
+}
+
+.page-header h1{
+
+font-size:30px;
+
+}
+
+.products{
+
+padding:15px;
+
+}
+
 }
 
 </style>
@@ -206,89 +423,179 @@ button {
 
 <body>
 
-<!-- NAV -->
-<div class="nav">
-    <div>🛍️ Mtell Shop</div>
-    <div>
-        <a href="<?= $base ?>index.php">Home</a>
-        <a href="<?= $base ?>cart/cart.php">🛒 Cart (<?= $cartCount ?>)</a>
-    </div>
-</div>
+<div class="navbar">
 
-<div class="container">
+<div class="logo">
 
-<!-- SIDEBAR -->
-<div class="sidebar">
-
-<form method="GET">
-
-<h3>🔍 Search</h3>
-<input type="text" name="search" value="<?= htmlspecialchars($search) ?>">
-
-<h3>📂 Category</h3>
-<select name="category_id">
-<option value="">All Categories</option>
-
-<?php while($c = $cats->fetch_assoc()): ?>
-
-<option
-    value="<?= $c['id'] ?>"
-    <?= $category_id==$c['id'] ? 'selected' : '' ?>
->
-    <?= htmlspecialchars($c['name']) ?>
-</option>
-
-<?php endwhile; ?>
-
-</select>
-
-<h3>💰 Price</h3>
-<input type="number" name="min_price" placeholder="Min" value="<?= $min_price ?>">
-<input type="number" name="max_price" placeholder="Max" value="<?= $max_price ?>">
-
-<h3>🔽 Sort</h3>
-<select name="sort">
-<option value="">Default</option>
-<option value="price_asc" <?= $sort=='price_asc'?'selected':'' ?>>Low → High</option>
-<option value="price_desc" <?= $sort=='price_desc'?'selected':'' ?>>High → Low</option>
-</select>
-
-<button type="submit">Apply</button>
-
-</form>
+Mtell Shop
 
 </div>
 
-<!-- PRODUCTS -->
-<div class="content">
+<div class="nav-links">
 
-<h2>Products</h2>
+<a href="<?= $base ?>index.php">
 
-<div class="grid">
+Home
 
-<?php while($p = $res->fetch_assoc()): ?>
+</a>
+
+<a href="<?= $base ?>shop.php">
+
+Shop
+
+</a>
+
+<a href="<?= $base ?>contact.php">
+
+Contact
+
+</a>
+
+<a
+class="cart"
+href="<?= $base ?>cart/cart.php">
+
+Cart (<?= $cartCount ?>)
+
+</a>
+
+</div>
+
+</div>
+
+<div class="page-header">
+
+<h1>
+
+Shop Online
+
+</h1>
+
+<p>
+
+Browse our latest online products by category.
+
+</p>
+
+</div>
+<?php while($cat = $categories->fetch_assoc()): ?>
+
+<?php
+
+$onlineBranch = 1; // Change if your online branch is different
+
+$products = $conn->query("
+SELECT
+    id,
+    name,
+    online_price,
+    online_image,
+    image,
+    stock
+FROM products
+WHERE
+    category_id = {$cat['id']}
+    AND online_price > 0
+ORDER BY name ASC
+");
+if($products->num_rows == 0){
+    continue;
+}
+
+?>
+
+<h2 class="category-title">
+
+    <?= htmlspecialchars($cat['name']) ?>
+
+</h2>
+
+<div class="products">
+
+<?php while($p = $products->fetch_assoc()): ?>
 
 <div class="card">
 
+    <span class="badge">
+
+        NEW
+
+    </span>
+
+    <a href="<?= $base ?>product.php?id=<?= $p['id'] ?>">
+<?php
+
+$image = !empty($p['online_image'])
+    ? $p['online_image']
+    : $p['image'];
+
+?>
+
 <img
-    src="<?= $base ?>uploads/<?= htmlspecialchars($p['online_image'] ?: 'default.png') ?>"
-    alt="<?= htmlspecialchars($p['name']) ?>"
->
+src="<?= $base ?>uploads/<?= htmlspecialchars($image) ?>"
+alt="<?= htmlspecialchars($p['name']) ?>">
 
-<h3><?= htmlspecialchars($p['name']) ?></h3>
+    </a>
 
-<a href="<?= $base ?>product.php?id=<?= $p['id'] ?>" class="view-btn">
-    View Product
-</a>
+    <div class="card-body">
 
-<p>KES <?= number_format($p['online_price'],2) ?></p>
-<p>Stock: <?= $p['stock'] ?></p>
+        <h3>
 
-<form method="POST" action="<?= $base ?>cart/add-to-cart.php">
-<input type="hidden" name="product_id" value="<?= $p['id'] ?>">
-<input type="number" name="quantity" value="1" min="1">
-<button>Add to Cart</button>
-</form>
+            <?= htmlspecialchars($p['name']) ?>
+
+        </h3>
+
+        <div style="color:#ffc107;font-size:18px;margin:8px 0;">
+
+?????
+
+</div>
+
+        <div class="price">
+
+            KES <?= number_format($p['online_price'],2) ?>
+
+        </div>
+
+        <div class="stock">
+
+In Stock (<?= $p['stock'] ?>)
+
+</div>
+
+        <a
+        href="<?= $base ?>product.php?id=<?= $p['id'] ?>"
+        class="btn view-btn">
+
+            View Product
+
+        </a>
+
+        <form
+        action="<?= $base ?>cart/add-to-cart.php"
+        method="POST">
+
+            <input
+            type="hidden"
+            name="product_id"
+            value="<?= $p['id'] ?>">
+
+            <input
+            type="hidden"
+            name="quantity"
+            value="1">
+
+            <button
+            type="submit"
+            class="btn cart-btn">
+
+                Add to Cart
+
+            </button>
+
+        </form>
+
+    </div>
 
 </div>
 
@@ -296,24 +603,59 @@ button {
 
 </div>
 
-<!-- PAGINATION -->
-<div class="pagination" style="text-align:center; margin-top:20px;">
+<?php endwhile; ?>
+<!-- ===========================
+FOOTER
+=========================== -->
 
-<?php for($i=1; $i <= $totalPages; $i++): ?>
+<footer>
 
-<a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&category_id=<?= $category_id ?>&sort=<?= $sort ?>">
-<button <?= $i==$page?'style="background:black;color:white"':'' ?>>
-<?= $i ?>
-</button>
-</a>
+    <h2 style="margin-bottom:15px;">
 
-<?php endfor; ?>
+        Mtell Online Shopping
 
-</div>
+    </h2>
 
-</div>
+    <p style="margin-bottom:15px;">
 
-</div>
+        Kenya's trusted online marketplace for Phones,
+        Electronics, Fashion, Beauty and Home Appliances.
 
-</body>
-</html>
+    </p>
+
+    <div style="
+        display:flex;
+        justify-content:center;
+        gap:30px;
+        flex-wrap:wrap;
+        margin:25px 0;
+    ">
+
+        <a href="<?= $base ?>index.php"
+           style="color:white;">
+            Home
+        </a>
+
+        <a href="<?= $base ?>about.php"
+           style="color:white;">
+            About
+        </a>
+
+        <a href="<?= $base ?>contact.php"
+           style="color:white;">
+            Contact
+        </a>
+
+        <a href="<?= $base ?>privacy.php"
+           style="color:white;">
+            Privacy Policy
+        </a>
+
+        <a href="<?= $base ?>terms.php"
+           style="color:white;">
+            Terms & Conditions
+        </a>
+
+    </div>
+
+    <div

@@ -406,7 +406,7 @@ $stmt->close();
         })
 
         .then(() => {
-            alert('📲 STK Sent');
+            alert(' STK Sent');
         })
 
         .finally(() => {
@@ -524,27 +524,69 @@ select {
 
 <div id="receipt" style="margin:auto;width:300px;">
 
-<h3>🧾 RECEIPT</h3>
+<div style="text-align:center;">
 
-<?php while($i = $items->fetch_assoc()): ?>
+<img
+src="/infinity/uploads/Mtell Online Shopping.jpg"
+width="90"
+alt="MTELL"
+>
 
-<div>
-<?= htmlspecialchars($i['name']) ?>
-x<?= (int)$i['qty'] ?>
-</div>
+<h2>MTELL</h2>
 
-<?php endwhile; ?>
+<p>
+HQ Nairobi<br>
+Phone: +254 106 552 658
+</p>
 
 <hr>
 
-<b>
-KES <?= number_format($sale['total'],2) ?>
-</b>
+<p>
+Receipt No: <?= $sale['id'] ?><br>
+Date: <?= date('d-m-Y H:i:s') ?><br>
+Cashier: <?= htmlspecialchars($_SESSION['username'] ?? 'System') ?>
+</p>
 
-<br><br>
+</div>
+
+<table width="100%">
+<?php while($i = $items->fetch_assoc()): ?>
+<tr>
+<td><?= htmlspecialchars($i['name']) ?></td>
+<td>x<?= (int)$i['qty'] ?></td>
+<td align="right">
+KES <?= number_format($i['qty'] * $i['price'],2) ?>
+</td>
+</tr>
+<?php endwhile; ?>
+</table>
+
+<hr>
+
+<?php
+$vat = $sale['total'] * 0.16;
+$subtotal = $sale['total'] - $vat;
+?>
+
+<p>Subtotal: KES <?= number_format($subtotal,2) ?></p>
+<p>VAT (16%): KES <?= number_format($vat,2) ?></p>
+
+<h3>
+TOTAL: KES <?= number_format($sale['total'],2) ?>
+</h3>
+
+<hr>
+
+<p>
+Thank You For Your Business!
+</p>
+
+<p>
+Powered by MTELL ERP
+</p>
 
 <button onclick="window.print()">
-🖨 Print
+Print Receipt
 </button>
 
 </div>
@@ -627,7 +669,7 @@ Stock: <?= (int)$p['stock'] ?>
 
 <div class="cart" id="cart">
 
-<h2>🛒 Cart</h2>
+<h2>Cart</h2>
 
 <?php
 $total = 0;

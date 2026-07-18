@@ -1,0 +1,260 @@
+<?php
+//==================================================
+// FLASH SALE
+//==================================================
+
+// Check if the products table has an is_deal column
+$hasDealColumn = false;
+
+$check = $conn->query("SHOW COLUMNS FROM products LIKE 'is_deal'");
+
+if ($check && $check->num_rows > 0) {
+    $hasDealColumn = true;
+}
+
+// Build SQL
+if ($hasDealColumn) {
+
+    $sql = "
+    SELECT
+        id,
+        name,
+        online_price,
+        retail_price,
+        online_image,
+        image,
+        stock
+    FROM products
+    WHERE
+        category_id = 1
+        AND online_price > 0
+        AND stock > 0
+        AND is_deal = 1
+        AND (
+            online_image <> ''
+            OR image <> ''
+        )
+    ORDER BY created_at DESC
+    LIMIT 8
+    ";
+
+} else {
+
+    $sql = "
+    SELECT
+        id,
+        name,
+        online_price,
+        retail_price,
+        online_image,
+        image,
+        stock
+    FROM products
+    WHERE
+        category_id = 1
+        AND online_price > 0
+        AND stock > 0
+        AND (
+            online_image <> ''
+            OR image <> ''
+        )
+    ORDER BY created_at DESC
+    LIMIT 8
+    ";
+
+}
+
+$result = $conn->query($sql);
+?>
+
+<section class="flash-sale">
+
+<div class="container">
+
+<div class="flash-header">
+
+<div>
+
+<h2>
+Flash Sale
+</h2>
+
+<p>
+Limited Time Electronics Offers
+</p>
+
+</div>
+
+<div class="countdown">
+
+<div class="count-box" id="flashCountdown">
+
+23:59:59
+
+</div>
+
+</div>
+
+</div>
+
+<div class="products-grid">
+
+<?php if ($result && $result->num_rows > 0): ?>
+
+<?php while ($product = $result->fetch_assoc()): ?>
+
+<?php
+
+$image = "/infinity/assets/images/no-image.png";
+
+if (!empty($product['online_image'])) {
+
+    $image = "/infinity/uploads/" . $product['online_image'];
+
+} elseif (!empty($product['image'])) {
+
+    $image = "/infinity/uploads/" . $product['image'];
+
+}
+
+$price = (float)$product['online_price'];
+
+$oldPrice = (float)$product['retail_price'];
+
+$discount = 0;
+
+if ($oldPrice > $price) {
+
+    $discount = round((($oldPrice - $price) / $oldPrice) * 100);
+
+}
+
+?>
+
+<div class="product-card fade-in">
+
+<div class="product-image">
+
+<?php if ($discount > 0): ?>
+
+<span class="sale-badge">
+
+-<?= $discount ?>%
+
+</span>
+
+<?php endif; ?>
+
+<img
+src="<?= $image ?>"
+alt="<?= htmlspecialchars($product['name']) ?>">
+
+<div class="product-actions">
+
+<a
+href="/infinity/product.php?id=<?= $product['id'] ?>"
+title="View">
+
+<i class="fa fa-eye"></i>
+
+</a>
+
+<a
+href="/infinity/cart/add-to-cart.php?id=<?= $product['id'] ?>"
+title="Add To Cart">
+
+<i class="fa fa-cart-plus"></i>
+
+</a>
+
+</div>
+
+</div>
+
+<div class="product-info">
+
+<h3 class="product-title">
+
+<?= htmlspecialchars($product['name']) ?>
+
+</h3>
+
+<div class="product-rating">
+
+★★★★★
+
+<span>(5.0)</span>
+
+</div>
+
+<div class="product-price">
+
+KES <?= number_format($price,2) ?>
+
+<?php if ($oldPrice > $price): ?>
+
+<span class="old-price">
+
+KES <?= number_format($oldPrice,2) ?>
+
+</span>
+
+<?php endif; ?>
+
+</div>
+
+<p class="<?= ($product['stock'] > 0) ? 'in-stock' : 'out-stock' ?>">
+
+<?= ($product['stock'] > 0) ? 'In Stock' : 'Out of Stock' ?>
+
+</p>
+
+<a
+class="add-cart-btn"
+href="/infinity/cart/add-to-cart.php?id=<?= $product['id'] ?>">
+
+Add To Cart
+
+</a>
+
+<a
+class="quick-view-btn"
+href="/infinity/product.php?id=<?= $product['id'] ?>">
+
+View Details
+
+</a>
+
+</div>
+
+</div>
+
+<?php endwhile; ?>
+
+<?php else: ?>
+
+<div class="empty-state">
+
+<i class="fa fa-tags"></i>
+
+<h3>
+
+No Flash Sale Products
+
+</h3>
+
+<p>
+
+No electronics are currently marked as Flash Sale.
+
+</p>
+
+</div>
+
+<?php endif; ?>
+
+</div>
+
+</div>
+
+</section>

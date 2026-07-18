@@ -1,0 +1,101 @@
+<?php
+//====================================================
+// SHOP CATEGORIES
+//====================================================
+
+$sql = "
+SELECT
+    c.id,
+    c.name,
+    COUNT(p.id) AS total_products,
+    (
+        SELECT p2.online_image
+        FROM products p2
+        WHERE p2.category_id = c.id
+        AND p2.online_image <> ''
+        LIMIT 1
+    ) AS category_image
+FROM categories c
+LEFT JOIN products p
+ON p.category_id = c.id
+WHERE c.id = 1
+GROUP BY c.id,c.name
+";
+
+$result = $conn->query($sql);
+?>
+
+<section class="categories">
+
+<div class="container">
+
+<div class="flex-between mb-40">
+
+<h2 class="section-title">
+Shop by Category
+</h2>
+
+<a href="/infinity/shop.php" class="btn">
+View All
+</a>
+
+</div>
+
+<div class="categories-grid">
+
+<?php if($result && $result->num_rows>0): ?>
+
+<?php while($category=$result->fetch_assoc()): ?>
+
+<?php
+$image = "/infinity/assets/images/no-image.png";
+
+if (!empty($category['category_image'])) {
+
+    $image = "/infinity/uploads/" . $category['category_image'];
+
+}
+?>
+
+<a
+href="/infinity/shop.php?category=<?= $category['id']; ?>"
+class="category-card">
+<img
+src="<?= htmlspecialchars($image); ?>"
+alt="<?= htmlspecialchars($category['name']); ?>">
+
+<h4>
+
+<?= htmlspecialchars($category['name']); ?>
+
+</h4>
+
+<p>
+
+<?= (int)$category['total_products']; ?>
+
+Products
+
+</p>
+
+</a>
+
+<?php endwhile; ?>
+
+<?php else: ?>
+
+<div class="empty-state">
+
+<h3>No Categories Found</h3>
+
+<p>Create categories in the admin panel.</p>
+
+</div>
+
+<?php endif; ?>
+
+</div>
+
+</div>
+
+</section>

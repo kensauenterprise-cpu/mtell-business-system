@@ -15,30 +15,31 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 // ==========================
-// ✅ DB CHECK
+// ? DB CHECK
 // ==========================
 if (!isset($conn) || !$conn) {
-    die("❌ Database connection failed");
+    die("? Database connection failed");
 }
 
 // ==========================
-// 🏢 BRANCH (NEW)
+// ?? BRANCH (NEW)
 // ==========================
 $branch_id = $_SESSION['branch_id'] ?? 1;
 
 // ==========================
-// 📦 MODE
+// ?? MODE
 // ==========================
 $mode = $_GET['mode'] ?? 'online';
 
 // ==========================
-// 🔍 FILTERS
+// ?? FILTERS
 // ==========================
 $search = $_GET['search'] ?? '';
 $category_id = (int)($_GET['category_id'] ?? 0);
 
+
 // ==========================
-// ➕ SAVE PRODUCT (ADD / UPDATE)
+// ? SAVE PRODUCT (ADD / UPDATE)
 // ==========================
 if (isset($_POST['save_product'])) {
 
@@ -52,10 +53,13 @@ if (isset($_POST['save_product'])) {
     $online     = (float) ($_POST['online_price'] ?? 0);
 
     $cost       = (float) ($_POST['cost_price'] ?? 0);
+$wholesale_cost =
+(float)($_POST['wholesale_cost_price'] ?? 0);
     $stock      = (int) ($_POST['stock'] ?? 0);
 
     $category_id = (int)($_POST['category_id'] ?? 0);
-
+$featured = isset($_POST['featured']) ? 1 : 0;
+$is_new   = isset($_POST['is_new']) ? 1 : 0;
 $online_image    = $_POST['existing_online_image'] ?? '';
 
 $targetDir = $_SERVER['DOCUMENT_ROOT'].'/infinity/uploads/';
@@ -79,89 +83,117 @@ if (!empty($_FILES['online_image']['name'])) {
     );
 }
     // ==========================
-    // ✏️ UPDATE
+    // ?? UPDATE
     // ==========================
     if ($id) {
 
-        $stmt = $conn->prepare("
-    UPDATE products
-    SET
-        name=?,
-        description=?,
-        retail_price=?,
-        wholesale_price=?,
-        online_price=?,
-        cost_price=?,
-        stock=?,
-        category_id=?,
-        online_image=?
-    WHERE id=? AND branch_id=?
+    $price = $retail;
+$image = $online_image;
+
+$stmt = $conn->prepare("
+UPDATE products
+SET
+    name=?,
+    description=?,
+    price=?,
+    image=?,
+    retail_price=?,
+    wholesale_price=?,
+    online_price=?,
+    cost_price=?,
+    wholesale_cost_price=?,
+    stock=?,
+    category_id=?,
+    online_image=?,
+featured=?,
+is_new=?
+WHERE id=? AND branch_id=?
 ");
         if ($stmt) {
-           $stmt->bind_param(
-    "ssddddiisii",
+
+    $stmt->bind_param(
+    "ssdsdddddiisiiii",
     $name,
     $desc,
+    $price,
+    $image,
     $retail,
     $wholesale,
     $online,
     $cost,
+    $wholesale_cost,
     $stock,
     $category_id,
     $online_image,
+    $featured,
+    $is_new,
     $id,
     $branch_id
 );
-            $stmt->execute();
 
-            $stmt->close();
-        }
+    $stmt->execute();
+    $stmt->close();
+}
 
     } else {
 
         // ==========================
-        // ➕ INSERT
-        // ==========================
-        $stmt = $conn->prepare("
+// INSERT
+// ==========================
+
+$price = $retail;
+$image = $online_image;
+
+$stmt = $conn->prepare("
 INSERT INTO products
 (
     name,
     description,
+    price,
+    image,
     retail_price,
     wholesale_price,
     online_price,
     cost_price,
+    wholesale_cost_price,
     stock,
     category_id,
     online_image,
+    featured,
+    is_new,
     branch_id,
     created_at
 )
 VALUES
 (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
 )
-        ");
+");
 
-        if ($stmt) {
+if ($stmt) {
 
-            $stmt->bind_param(
-    "ssddddiisi",
-    $name,
-    $desc,
-    $retail,
-    $wholesale,
-    $online,
-    $cost,
-    $stock,
-    $category_id,
-    $online_image,
-    $branch_id
-);
-            $stmt->execute();
+    $stmt->bind_param(
+        "ssdsdddddiisiii",
+        $name,
+        $desc,
+        $price,
+        $image,
+        $retail,
+        $wholesale,
+        $online,
+        $cost,
+        $wholesale_cost,
+        $stock,
+        $category_id,
+        $online_image,
+        $featured,
+        $is_new,
+        $branch_id
+    );
 
-            $stmt->close();
-        }
+    $stmt->execute();
+    $stmt->close();
+}
     }
 header("Location: ?tab=products&mode=".$mode."&updated=1");
 
@@ -169,7 +201,7 @@ header("Location: ?tab=products&mode=".$mode."&updated=1");
 }
 
 // ==========================
-// 🗑 DELETE (SECURED)
+// ?? DELETE (SECURED)
 // ==========================
 if (isset($_POST['delete_id'])) {
 
@@ -199,7 +231,7 @@ if (isset($_POST['delete_id'])) {
 }
 
 // ==========================
-// 📦 FETCH PRODUCTS
+// ?? FETCH PRODUCTS
 // ==========================
 $sql = "
 SELECT p.*, c.name AS category_name
@@ -236,7 +268,7 @@ $stmt = $conn->prepare($sql);
 
 if (!$stmt) {
 
-    die("❌ Failed to load products");
+    die("? Failed to load products");
 }
 
 $stmt->bind_param($types, ...$params);
@@ -246,7 +278,7 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 // ==========================
-// 📊 TOTAL PRODUCTS
+// ?? TOTAL PRODUCTS
 // ==========================
 $total_products = 0;
 
@@ -273,7 +305,7 @@ if ($stmt2) {
 }
 
 // ==========================
-// ⚠️ LOW STOCK
+// ?? LOW STOCK
 // ==========================
 $low_stock = 0;
 
@@ -326,9 +358,7 @@ if ($stmt3) {
 <h2>
 Products (<?= strtoupper($mode) ?>)
 </h2>
-<h2>
-Products (<?= strtoupper($mode) ?>)
-</h2>
+
 
 <div class="stats">
 
@@ -452,12 +482,18 @@ if (isset($_GET['edit_id'])) {
        value="<?= $editProduct['online_price'] ?? '' ?>"
        placeholder="Online Price"
        required>
-
 <input type="number"
        step="0.01"
        name="cost_price"
        value="<?= $editProduct['cost_price'] ?? '' ?>"
-       placeholder="Cost Price"
+       placeholder="Retail/Online Cost Price"
+       required>
+
+<input type="number"
+       step="0.01"
+       name="wholesale_cost_price"
+       value="<?= $editProduct['wholesale_cost_price'] ?? '' ?>"
+       placeholder="Wholesale Cost Price"
        required>
 
 <input type="number"
@@ -487,7 +523,21 @@ if (isset($_GET['edit_id'])) {
     <?php endwhile; ?>
 
 </select>
+<label>
+    <input type="checkbox"
+           name="featured"
+           value="1"
+           <?= !empty($editProduct['featured']) ? 'checked' : '' ?>>
+    Featured Product
+</label>
 
+<label>
+    <input type="checkbox"
+           name="is_new"
+           value="1"
+           <?= !empty($editProduct['is_new']) ? 'checked' : '' ?>>
+    New Arrival
+</label>
 <label>Online Image</label>
 <input type="file" name="online_image">
 
@@ -530,7 +580,44 @@ switch ($mode) {
         break;
 }
 
-$profit = $selling_price - $row['cost_price'];
+if($mode == 'wholesale'){
+    $cost_used = $row['wholesale_cost_price'];
+}else{
+    $cost_used = $row['cost_price'];
+}
+
+$retail_profit =
+$row['retail_price']
+-
+$row['cost_price'];
+
+$online_profit =
+$row['online_price']
+-
+$row['cost_price'];
+
+$wholesale_profit =
+$row['wholesale_price']
+-
+$row['wholesale_cost_price'];
+$total_stock_value =
+$row['stock'] *
+$row['cost_price'];
+
+$total_retail_profit =
+$row['stock'] *
+$retail_profit;
+
+$total_wholesale_profit =
+$row['stock'] *
+$wholesale_profit;
+
+$total_online_profit =
+$row['stock'] *
+$online_profit;
+$profit =
+$selling_price -
+$cost_used;
 
 $margin = $selling_price > 0
     ? ($profit / $selling_price) * 100
@@ -575,12 +662,47 @@ $productImage = !empty($row['online_image'])
     </p>
 
     <p>
-    Cost Price: KES <?= number_format($row['cost_price'], 2) ?>
-    </p>
+Retail/Online Cost:
+KES <?= number_format($row['cost_price'],2) ?>
+</p>
 
-    <p style="color:<?= $profit >= 0 ? 'green' : 'red' ?>">
-        Profit: KES <?= number_format($profit, 2) ?>
-    </p>
+<p>
+Wholesale Cost:
+KES <?= number_format($row['wholesale_cost_price'],2) ?>
+</p>
+    <p>
+Retail Profit:
+KES <?= number_format($retail_profit,2) ?>
+</p>
+
+<p>
+Wholesale Profit:
+KES <?= number_format($wholesale_profit,2) ?>
+</p>
+
+<p>
+Online Profit:
+KES <?= number_format($online_profit,2) ?>
+</p>
+<p>
+Stock Value:
+KES <?= number_format($total_stock_value,2) ?>
+</p>
+
+<p>
+Expected Retail Profit:
+KES <?= number_format($total_retail_profit,2) ?>
+</p>
+
+<p>
+Expected Wholesale Profit:
+KES <?= number_format($total_wholesale_profit,2) ?>
+</p>
+
+<p>
+Expected Online Profit:
+KES <?= number_format($total_online_profit,2) ?>
+</p>
 
     <p style="color:<?= $margin >= 30 ? 'green' : ($margin >= 10 ? 'orange' : 'red') ?>">
         Margin: <?= round($margin, 2) ?>%

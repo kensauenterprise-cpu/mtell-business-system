@@ -1,96 +1,191 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/db.php';
 
-if (!isset($conn) || !$conn) {
-    die("Database connection failed.");
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (!isset($conn) || !$conn instanceof mysqli) {
+    die("❌ Database connection failed");
 }
 
 // Products
 $products = $conn->query("
-    SELECT *
+    SELECT id, name
     FROM products
     ORDER BY name ASC
 ");
 
 // Suppliers
 $suppliers = $conn->query("
-    SELECT *
+    SELECT id, name
     FROM suppliers
     ORDER BY name ASC
 ");
 
-// Save Purchase
-if (isset($_POST['save'])) {
+// ==========================
+// SAVE PURCHASE
+// ==========================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $supplier_id  = (int)$_POST['supplier_id'];
-    $product_id   = (int)$_POST['product_id'];
-    $quantity     = (int)$_POST['quantity'];
-    $cost_price   = (float)$_POST['cost_price'];
-    $purchase_date = $_POST['purchase_date'];
+    $supplier_id   = (int)($_POST['supplier_id'] ?? 0);
+   $product_ids = $_POST['product_id'] ?? [];
+$quantities = $_POST['quantity'] ?? [];
+$cost_prices = $_POST['cost_price'] ?? [];
 
-    $branch_id = $_SESSION['branch_id'] ?? 1;
+$vat_rate = (float)($_POST['vat_rate'] ?? 16);
+    $purchase_date = $_POST['purchase_date'] ?? date('Y-m-d');
+
+   if (
+    $supplier_id <= 0 ||
+    empty($product_ids)
+) {
+    die("❌ Please select supplier and products.");
+}
+
+    $branch_id = (int)($_SESSION['branch_id'] ?? 1);
     $created_by = $_SESSION['username'] ?? 'System';
+$invoice_no =
+'PUR-' .
+date('Ymd-His');
 
-    $total_cost = $quantity * $cost_price;
-
-    $stmt = $conn->prepare("
-        INSERT INTO purchases (
-            supplier_id,
-            product_id,
-            quantity,
-            cost_price,
-            total_cost,
-            purchase_date,
-            branch_id,
-            created_by,
-            total,
-            status
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-
+    
     $status = 'Completed';
 
-    $stmt->bind_param(
-        "iiiddsisss",
-        $supplier_id,
-        $product_id,
-        $quantity,
-        $cost_price,
-        $total_cost,
-        $purchase_date,
-        $branch_id,
-        $created_by,
-        $total_cost,
-        $status
-    );
+    $conn->begin_transaction();
 
-    if (!$stmt->execute()) {
-        die("Purchase Error: " . $stmt->error);
-    }
+    try {
 
-    // Update Product Stock
+        // ==========================
+        $invoice_subtotal = 0;
+
+foreach($product_ids as $i => $product_id){
+
+    $product_id = (int)$product_id;
+    $quantity = (int)$quantities[$i];
+    $cost_price = (float)$cost_prices[$i];
+if (
+    $product_id <= 0 ||
+    $quantity <= 0 ||
+    $cost_price <= 0
+) {
+    continue;
+}
+
+    $line_total = $quantity * $cost_price;
+
+    $invoice_subtotal += $line_total;
+
+ $stmt = $conn->prepare("
+    INSERT INTO purchases (
+        supplier_id,
+        invoice_no,
+        product_id,
+        quantity,
+        cost_price,
+        total_cost,
+        purchase_date,
+        branch_id,
+        created_by,
+        total,
+        vat_rate,
+        vat_amount,
+        status
+    )
+    VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    )
+");
+
+if (!$stmt) {
+    throw new Exception($conn->error);
+}
+
+   $line_vat =
+    $line_total *
+    ($vat_rate / 100);
+
+$stmt->bind_param(
+    "isiiddsisddds",
+    $supplier_id,
+    $invoice_no,
+    $product_id,
+    $quantity,
+    $cost_price,
+    $line_total,
+    $purchase_date,
+    $branch_id,
+    $created_by,
+    $line_total,
+    $vat_rate,
+    $line_vat,
+    $status
+);
+
+ if (!$stmt->execute()) {
+    throw new Exception($stmt->error);
+}
+
     $update = $conn->prepare("
-        UPDATE products
-        SET stock = stock + ?
-        WHERE id = ?
-    ");
+    UPDATE products
+    SET
+        stock = stock + ?,
+        cost_price = ?,
+        cost = ?
+    WHERE id = ?
+");
+
+if (!$update) {
+    throw new Exception($conn->error);
+}
 
     $update->bind_param(
-        "ii",
+        "iddi",
         $quantity,
+        $cost_price,
+        $cost_price,
         $product_id
     );
 
     if (!$update->execute()) {
-        die("Stock Update Error: " . $update->error);
-    }
+    throw new Exception($update->error);
+}
+}
 
-    echo "<script>
-        alert('Purchase saved successfully.');
-        window.location.href='dashboard.php?tab=purchases';
-    </script>";
-    exit;
+$vat_amount =
+    $invoice_subtotal *
+    ($vat_rate / 100);
+
+$grand_total =
+    $invoice_subtotal +
+    $vat_amount;
+$_SESSION['purchase_summary'] = [
+    'invoice_no'  => $invoice_no,
+    'subtotal'    => $invoice_subtotal,
+    'vat_rate'    => $vat_rate,
+    'vat_amount'  => $vat_amount,
+    'grand_total' => $grand_total
+];
+
+        $conn->commit();
+
+        echo "
+        <script>
+            alert('✅ Purchase saved successfully');
+            window.location='?tab=purchases';
+        </script>";
+        exit;
+
+    } catch (Exception $e) {
+
+        $conn->rollback();
+
+        die(
+            '❌ Purchase Error: ' .
+            htmlspecialchars($e->getMessage())
+        );
+    }
 }
 ?>
 
@@ -103,62 +198,113 @@ if (isset($_POST['save'])) {
         <option value="">Select Supplier</option>
 
         <?php while ($s = $suppliers->fetch_assoc()): ?>
-            <option value="<?= $s['id']; ?>">
-                <?= htmlspecialchars($s['name']); ?>
+            <option value="<?= $s['id'] ?>">
+                <?= htmlspecialchars($s['name']) ?>
             </option>
         <?php endwhile; ?>
 
     </select>
 
     <br><br>
+<table border="1" cellpadding="5" id="purchaseTable">
+<tr>
+    <th>Product</th>
+    <th>Qty</th>
+    <th>Cost Price</th>
+</tr>
 
-    <label>Product</label><br>
-    <select name="product_id" required>
-        <option value="">Select Product</option>
+<tr>
+    <td>
+        <select name="product_id[]" required>
+            <option value="">Select Product</option>
 
-        <?php while ($p = $products->fetch_assoc()): ?>
-            <option value="<?= $p['id']; ?>">
-                <?= htmlspecialchars($p['name']); ?>
-            </option>
-        <?php endwhile; ?>
+            <?php
+            $products2 = $conn->query("
+                SELECT id,name
+                FROM products
+                ORDER BY name
+            ");
 
-    </select>
+            while($p = $products2->fetch_assoc()):
+            ?>
+                <option value="<?= $p['id'] ?>">
+                    <?= htmlspecialchars($p['name']) ?>
+                </option>
+            <?php endwhile; ?>
+        </select>
+    </td>
 
-    <br><br>
+    <td>
+        <input
+            type="number"
+            name="quantity[]"
+            min="1"
+            required
+        >
+    </td>
 
-    <label>Quantity</label><br>
-    <input
-        type="number"
-        name="quantity"
-        min="1"
-        required
-    >
+    <td>
+        <input
+            type="number"
+            name="cost_price[]"
+            step="0.01"
+            min="0.01"
+            required
+        >
+    </td>
+</tr>
+</table>
 
-    <br><br>
+<br>
 
-    <label>Cost Price</label><br>
-    <input
-        type="number"
-        step="0.01"
-        name="cost_price"
-        min="0"
-        required
-    >
+<button type="button" onclick="addRow()">
++ Add Item
+</button>
 
-    <br><br>
+<br><br>
+
+
+<label>VAT Rate (%)</label>
+<input
+    type="number"
+    name="vat_rate"
+    value="16"
+    step="0.01"
+>
+
+<br><br>
 
     <label>Purchase Date</label><br>
     <input
         type="date"
         name="purchase_date"
-        value="<?= date('Y-m-d'); ?>"
+        value="<?= date('Y-m-d') ?>"
         required
     >
 
     <br><br>
 
-    <button type="submit" name="save">
-        Save Purchase
+    <button type="submit">
+        💾 Save Purchase
     </button>
 
 </form>
+<script>
+function addRow(){
+
+    let table =
+        document.getElementById(
+            'purchaseTable'
+        );
+
+    let row =
+        table.rows[1].cloneNode(true);
+
+    row.querySelectorAll('input')
+       .forEach(el => el.value='');
+
+    row.querySelector('select').selectedIndex = 0;
+
+    table.appendChild(row);
+}
+</script>

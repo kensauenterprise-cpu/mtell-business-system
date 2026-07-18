@@ -1,0 +1,24 @@
+# Safaricom secrets
+helpers/token_helper.php
+admin/includes/mpesa_config.php
+
+# Google OAuth secrets
+config/google_oauth.php
+
+# OAuth files
+includes/oauth.php
+includes/search_console.php
+
+# Local tokens
+tokens/
+
+# Composer-
+vendor/
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local

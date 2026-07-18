@@ -1,0 +1,83 @@
+<?php
+define('BASE_URL','/infinity/');
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>About Us - Mtell Online Shopping</title>
+
+<style>
+body{
+    font-family:Arial,sans-serif;
+    max-width:1000px;
+    margin:auto;
+    padding:30px;
+    line-height:1.8;
+}
+
+h1,h2{
+    color:#0d6efd;
+}
+
+.btn{
+    display:inline-block;
+    padding:10px 15px;
+    background:#0d6efd;
+    color:white;
+    text-decoration:none;
+    border-radius:5px;
+}
+</style>
+</head>
+<body>
+
+<a href="https://mtell.kesug.com/index.php" class="btn">
+Back Home
+</a>
+
+<h1>About Mtell Online Shopping</h1>
+
+<p>
+Mtell Online Shopping is a Kenyan e-commerce platform providing customers with quality products at competitive prices.
+</p>
+
+<p>
+We specialize in:
+</p>
+
+<ul>
+<li>Electronics</li>
+<li>Mobile Phones</li>
+<li>Fashion</li>
+<li>Beauty Products</li>
+<li>Home & Living</li>
+<li>Supermarket Products</li>
+</ul>
+
+<h2>Our Mission</h2>
+
+<p>
+To provide a secure, affordable and convenient online shopping experience for customers across Kenya.
+</p>
+
+<h2>Why Choose Us?</h2>
+
+<ul>
+<li>Fast Delivery</li>
+<li>Secure M-Pesa Payments</li>
+<li>Real-Time Stock Tracking</li>
+<li>Affordable Prices</li>
+<li>Reliable Customer Support</li>
+</ul>
+
+<hr>
+
+<p>
+© <?= date('Y') ?> Mtell Online Shopping.
+</p>
+
+</body>
+</html>

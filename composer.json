@@ -1,0 +1,11 @@
+{
+    "name": "mtell/seo-sync",
+    "description": "Mtell Google Search Console Synchronization",
+    "type": "project",
+    "require": {
+        "google/apiclient": "^2.16"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

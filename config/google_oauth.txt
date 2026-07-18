@@ -1,0 +1,36 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| GOOGLE OAUTH CONFIGURATION
+|--------------------------------------------------------------------------
+*/
+
+define('GOOGLE_CLIENT_ID',
+'');
+
+define('GOOGLE_CLIENT_SECRET',
+');
+
+define('GOOGLE_REDIRECT_URI',
+'https://mtell.kesug.com/infinity/seo_sync.php');
+
+define('GOOGLE_TOKEN_URL',
+'https://oauth2.googleapis.com/token');
+
+define('GOOGLE_AUTH_URL',
+'https://accounts.google.com/o/oauth2/v2/auth');
+
+define('GOOGLE_SCOPE',
+'https://www.googleapis.com/auth/webmasters.readonly');
+
+define('GOOGLE_API',
+'https://searchconsole.googleapis.com/webmasters/v3');
+
+define('GOOGLE_PROPERTY',
+'https://mtell.kesug.com/');
+
+// OR
+// https://mtell.kesug.com/
+
+?>

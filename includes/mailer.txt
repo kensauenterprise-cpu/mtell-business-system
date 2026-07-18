@@ -1,0 +1,202 @@
+<?php
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/vendor/PHPMailer/src/Exception.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/vendor/PHPMailer/src/PHPMailer.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/vendor/PHPMailer/src/SMTP.php';
+
+function sendMailMessage($toEmail,$toName,$subject,$body){
+
+    $mail = new PHPMailer(true);
+
+    try{
+
+        $mail->isSMTP();
+
+        $mail->Host = 'smtp.gmail.com';
+
+        $mail->SMTPAuth = true;
+
+        $mail->Username = 'kensauenterprise@gmail.com';
+
+        /*
+        Replace this with your Gmail App Password
+        */
+        $mail->Password = 'YOUR_GMAIL_APP_PASSWORD';
+
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+
+        $mail->Port = 587;
+
+        $mail->setFrom(
+            'kensauenterprise@gmail.com',
+            'Mtell Online Shopping'
+        );
+
+        $mail->addAddress($toEmail,$toName);
+
+        $mail->isHTML(true);
+
+        $mail->Subject = $subject;
+
+        $mail->Body = $body;
+
+        return $mail->send();
+
+    }catch(Exception $e){
+
+        error_log($mail->ErrorInfo);
+
+        return false;
+
+    }
+
+}
+function sendCustomerOrderEmail(
+    $email,
+    $customer,
+    $orderId,
+    $itemsHtml,
+    $total
+){
+
+$body="
+
+<h2>Thank you for shopping with Mtell Online Shopping</h2>
+
+<p>Hello <b>$customer</b>,</p>
+
+<p>Your order has been received.</p>
+
+<h3>Order #$orderId</h3>
+
+<table border='1' cellpadding='8' cellspacing='0' width='100%'>
+
+<tr>
+
+<th>Items</th>
+
+</tr>
+
+$itemsHtml
+
+</table>
+
+<h3>Total : KES ".number_format($total,2)."</h3>
+
+<p>
+
+We shall contact you once your order has been processed.
+
+</p>
+
+";
+
+return sendMailMessage(
+
+$email,
+
+$customer,
+
+"Order Confirmation #".$orderId,
+
+$body
+
+);
+
+}
+function sendAdminOrderEmail(
+
+$orderId,
+
+$customer,
+
+$email,
+
+$phone,
+
+$payment,
+
+$itemsHtml,
+
+$total
+
+){
+
+$body="
+
+<h2>New Online Order Received</h2>
+
+<table border='1' cellpadding='8' cellspacing='0' width='100%'>
+
+<tr>
+
+<td><b>Order</b></td>
+
+<td>#".$orderId."</td>
+
+</tr>
+
+<tr>
+
+<td><b>Customer</b></td>
+
+<td>".$customer."</td>
+
+</tr>
+
+<tr>
+
+<td><b>Email</b></td>
+
+<td>".$email."</td>
+
+</tr>
+
+<tr>
+
+<td><b>Phone</b></td>
+
+<td>".$phone."</td>
+
+</tr>
+
+<tr>
+
+<td><b>Payment</b></td>
+
+<td>".$payment."</td>
+
+</tr>
+
+</table>
+
+<br>
+
+<h3>Items</h3>
+
+<table border='1' cellpadding='8' cellspacing='0' width='100%'>
+
+".$itemsHtml."
+
+</table>
+
+<h2>Total : KES ".number_format($total,2)."</h2>
+
+";
+
+return sendMailMessage(
+
+"kensauenterprise@gmail.com",
+
+"Super Admin",
+
+"NEW ORDER #".$orderId,
+
+$body
+
+);
+
+}

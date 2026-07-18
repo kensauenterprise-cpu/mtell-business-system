@@ -21,11 +21,21 @@ foreach ($_SESSION['cart'] as $item) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-$phone = '254' . trim($_POST['phone'] ?? '');
+$phone = trim($_POST['phone'] ?? '');
 $address = trim($_POST['address'] ?? '');
+
+if (empty($phone)) {
+    die("Phone number is required");
+}
+
+$phone = '254' . $phone;
 
 if (!preg_match('/^2547\d{8}$/', $phone)) {
     die("Invalid phone number");
+}
+
+if (empty($address)) {
+    die("Delivery address is required");
 }
 
 if (empty($address)) {

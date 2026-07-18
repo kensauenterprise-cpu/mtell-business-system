@@ -1,0 +1,413 @@
+/*==================================================
+ MTELL ONLINE SHOPPING
+ Responsive Stylesheet
+==================================================*/
+
+/*==============================
+ Large Screens (1400px)
+==============================*/
+@media (max-width:1400px){
+
+.container{
+    width:95%;
+}
+
+.hero-content h1{
+    font-size:46px;
+}
+
+}
+
+/*==============================
+ Laptop (1200px)
+==============================*/
+@media (max-width:1200px){
+
+.header-flex{
+    gap:15px;
+}
+
+.logo h1{
+    font-size:30px;
+}
+
+.search-area input{
+    height:45px;
+}
+
+.products-grid{
+    grid-template-columns:repeat(4,1fr);
+}
+
+.categories-grid{
+    grid-template-columns:repeat(4,1fr);
+}
+
+.footer-grid{
+    grid-template-columns:repeat(2,1fr);
+}
+
+}
+
+/*==============================
+ Tablet Landscape
+==============================*/
+@media (max-width:992px){
+
+.top-bar{
+    display:none;
+}
+
+.header-flex{
+    flex-wrap:wrap;
+}
+
+.logo{
+    width:100%;
+    text-align:center;
+}
+
+.search-area{
+    width:100%;
+    order:3;
+    margin-top:15px;
+}
+
+.header-icons{
+    margin-left:auto;
+}
+
+.mobile-toggle{
+    display:block;
+}
+
+.navbar{
+    display:none;
+}
+
+.hero-slide{
+    flex-direction:column;
+    height:auto;
+}
+
+.hero-content{
+    width:100%;
+    padding:40px;
+    text-align:center;
+}
+
+.hero-image{
+    width:100%;
+    padding:20px;
+}
+
+.hero-content h1{
+    font-size:40px;
+}
+
+.services-grid{
+    grid-template-columns:repeat(2,1fr);
+}
+
+.products-grid{
+    grid-template-columns:repeat(3,1fr);
+}
+
+.categories-grid{
+    grid-template-columns:repeat(3,1fr);
+}
+
+.brand-grid{
+    grid-template-columns:repeat(3,1fr);
+}
+
+.testimonial-grid{
+    grid-template-columns:1fr;
+}
+
+.account-grid{
+    grid-template-columns:1fr;
+}
+
+.footer-grid{
+    grid-template-columns:repeat(2,1fr);
+}
+
+}
+
+/*==============================
+ Tablet Portrait
+==============================*/
+@media (max-width:768px){
+
+.container{
+    width:94%;
+}
+
+.logo h1{
+    font-size:28px;
+}
+
+.hero{
+    padding:20px 0;
+}
+
+.hero-content{
+    padding:30px 15px;
+}
+
+.hero-content h1{
+    font-size:34px;
+}
+
+.hero-content p{
+    font-size:16px;
+}
+
+.hero-buttons{
+    flex-direction:column;
+}
+
+.hero-buttons a{
+    width:100%;
+    text-align:center;
+}
+
+.products-grid{
+    grid-template-columns:repeat(2,1fr);
+}
+
+.categories-grid{
+    grid-template-columns:repeat(2,1fr);
+}
+
+.brand-grid{
+    grid-template-columns:repeat(2,1fr);
+}
+
+.services-grid{
+    grid-template-columns:1fr;
+}
+
+.footer-grid{
+    grid-template-columns:1fr;
+}
+
+.newsletter form{
+    flex-direction:column;
+}
+
+.newsletter input{
+    width:100%;
+    margin-bottom:15px;
+}
+
+.newsletter button{
+    width:100%;
+}
+
+.newsletter-footer form{
+    flex-direction:column;
+}
+
+.newsletter-footer input{
+    margin-bottom:15px;
+}
+
+.newsletter-footer button{
+    width:100%;
+}
+
+.cart-table{
+    display:block;
+    overflow-x:auto;
+}
+
+.table-responsive{
+    overflow-x:auto;
+}
+
+}
+
+/*==============================
+ Mobile Large
+==============================*/
+@media (max-width:576px){
+
+.logo h1{
+    font-size:24px;
+}
+
+.search-area input{
+    font-size:14px;
+}
+
+.search-area button{
+    width:50px;
+}
+
+.hero-content h5{
+    font-size:14px;
+}
+
+.hero-content h1{
+    font-size:28px;
+}
+
+.hero-content p{
+    font-size:15px;
+}
+
+.section-title{
+    font-size:28px;
+}
+
+.products-grid{
+    grid-template-columns:1fr;
+}
+
+.categories-grid{
+    grid-template-columns:1fr;
+}
+
+.brand-grid{
+    grid-template-columns:1fr;
+}
+
+.product-card{
+    max-width:360px;
+    margin:auto;
+}
+
+.category-card{
+    max-width:300px;
+    margin:auto;
+}
+
+.flash-header{
+    flex-direction:column;
+    gap:20px;
+}
+
+.countdown{
+    flex-wrap:wrap;
+    justify-content:center;
+}
+
+.header-icons{
+    gap:15px;
+}
+
+.footer{
+    text-align:center;
+}
+
+.social-icons{
+    justify-content:center;
+    display:flex;
+    flex-wrap:wrap;
+}
+
+.whatsapp-float{
+    width:55px;
+    height:55px;
+    font-size:26px;
+}
+
+.back-to-top{
+    width:50px;
+    height:50px;
+}
+
+}
+
+/*==============================
+ Mobile Small
+==============================*/
+@media (max-width:400px){
+
+.logo h1{
+    font-size:20px;
+}
+
+.hero-content h1{
+    font-size:24px;
+}
+
+.hero-content p{
+    font-size:14px;
+}
+
+.btn{
+    width:100%;
+    text-align:center;
+}
+
+.header-icons{
+    gap:10px;
+}
+
+.cart-count{
+    width:18px;
+    height:18px;
+    font-size:10px;
+}
+
+.newsletter h2{
+    font-size:28px;
+}
+
+.newsletter-footer h3{
+    font-size:24px;
+}
+
+.product-title{
+    font-size:16px;
+}
+
+.price{
+    font-size:20px;
+}
+
+}
+
+/*==============================
+ Landscape Phones
+==============================*/
+@media (max-height:500px){
+
+.hero{
+    min-height:auto;
+}
+
+.mobile-menu{
+    overflow-y:auto;
+}
+
+}
+
+/*==================================================
+ Print
+==================================================*/
+
+@media print{
+
+header,
+footer,
+.whatsapp-float,
+.back-to-top,
+.mobile-toggle,
+.newsletter{
+    display:none;
+}
+
+body{
+    background:#fff;
+}
+
+.product-card{
+    box-shadow:none;
+    border:1px solid #ddd;
+}
+
+}

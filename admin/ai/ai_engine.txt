@@ -1,0 +1,320 @@
+<?php
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+
+$branch_id = $_SESSION['branch_id'] ?? 1;
+
+if($branch_id=="all"){
+
+$sql="SELECT * FROM products";
+
+$stmt=$conn->prepare($sql);
+
+}else{
+
+$sql="SELECT * FROM products WHERE branch_id=?";
+
+$stmt=$conn->prepare($sql);
+
+$stmt->bind_param("i",$branch_id);
+
+}
+
+$stmt->execute();
+
+$products=$stmt->get_result();
+echo "<h2>Products Found: ".$products->num_rows."</h2>";
+echo "Current Branch: ".$branch_id."<hr>";
+
+echo "<h3>Total Products: ".$products->num_rows."</h3>";
+
+while($p=$products->fetch_assoc()){
+
+$product_id=$p['id'];
+echo "<hr>";
+echo "<b>Processing Product ID:</b> ".$product_id."<br>";
+echo "<b>Product Name:</b> ".$p['name']."<br>";
+$stock=(int)$p['stock'];
+
+
+
+/* ===========================
+   SALES LAST 30 DAYS
+=========================== */
+if($branch_id=="all"){
+
+$q="SELECT IFNULL(SUM(oi.quantity),0) total
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+WHERE oi.product_id=?
+AND o.created_at>=DATE_SUB(NOW(),INTERVAL 30 DAY)";
+
+$s=$conn->prepare($q);
+
+if(!$s){
+    die("Sales query prepare failed: ".$conn->error);
+}
+
+$s->bind_param("i",$product_id);
+
+}else{
+
+$q="SELECT IFNULL(SUM(oi.quantity),0) total
+
+FROM order_items oi
+
+JOIN orders o ON o.id=oi.order_id
+
+WHERE oi.product_id=?
+
+AND o.branch_id=?
+
+AND o.created_at>=DATE_SUB(NOW(),INTERVAL 30 DAY)";
+
+$s=$conn->prepare($q);
+
+$s->bind_param("ii",$product_id,$branch_id);
+
+}
+
+$s->execute();
+
+$sales=$s->get_result()->fetch_assoc()['total'];
+
+
+
+$daily=round($sales/30,2);
+
+
+
+$days_left=$daily>0
+
+? round($stock/$daily,1)
+
+:999;
+
+
+
+$recommended=max(0,ceil($daily*30-$stock));
+
+
+
+/* ===========================
+   GOOGLE SEO DATA
+=========================== */
+
+$seo=$conn->prepare("
+
+SELECT *
+
+FROM seo_metrics
+
+WHERE product_id=?
+
+LIMIT 1
+
+");
+if(!$seo){
+    die("SEO query prepare failed: ".$conn->error);
+}
+
+$seo->bind_param("i",$product_id);
+
+$seo->execute();
+
+$r=$seo->get_result()->fetch_assoc();
+
+
+
+$clicks=$r['clicks']??0;
+
+$impressions=$r['impressions']??0;
+
+$position=$r['position']??100;
+
+$ctr=$r['ctr']??0;
+
+
+
+/* ===========================
+   SEO SCORE
+=========================== */
+
+if($position<=10){
+
+$seoScore="Excellent";
+
+}elseif($position<=20){
+
+$seoScore="Good";
+
+}elseif($position<=50){
+
+$seoScore="Average";
+
+}else{
+
+$seoScore="Poor";
+
+}
+
+
+
+/* ===========================
+   DEMAND LEVEL
+=========================== */
+
+if($impressions>5000 && $stock<20){
+
+$demand="Very High";
+
+}elseif($impressions>2000){
+
+$demand="High";
+
+}elseif($impressions>500){
+
+$demand="Medium";
+
+}else{
+
+$demand="Low";
+
+}
+
+
+
+/* ===========================
+   AI RECOMMENDATION
+=========================== */
+
+$recommendation="";
+
+
+
+if($days_left<7){
+
+$recommendation.="Restock immediately. ";
+
+}
+
+
+
+if($position>20){
+
+$recommendation.="Improve SEO. ";
+
+}
+
+
+
+if($ctr<2){
+
+$recommendation.="Improve product title/meta description. ";
+
+}
+
+
+
+if($impressions>5000 && $stock<15){
+
+$recommendation.="Increase inventory before demand rises. ";
+
+}
+
+
+
+if($sales==0){
+
+    $recommendation.="Run promotions or discounts. ";
+
+}
+
+// Convert "all" branch to 0 before saving
+$save_branch = ($branch_id == "all") ? 0 : (int)$branch_id;
+
+/* ===========================
+   SAVE
+=========================== */
+
+$save = $conn->prepare("
+
+INSERT INTO ai_predictions
+(
+product_id,
+branch_id,
+predicted_daily_sales,
+days_to_stockout,
+recommended_restock,
+search_clicks,
+search_impressions,
+average_position,
+seo_score,
+demand_level,
+ai_recommendation,
+updated_at
+)
+VALUES
+(
+?,?,?,?,?,?,?,?,?,?,?,NOW()
+)
+ON DUPLICATE KEY UPDATE
+predicted_daily_sales=VALUES(predicted_daily_sales),
+days_to_stockout=VALUES(days_to_stockout),
+recommended_restock=VALUES(recommended_restock),
+search_clicks=VALUES(search_clicks),
+search_impressions=VALUES(search_impressions),
+average_position=VALUES(average_position),
+seo_score=VALUES(seo_score),
+demand_level=VALUES(demand_level),
+ai_recommendation=VALUES(ai_recommendation),
+updated_at=NOW()
+
+");
+
+if (!$save) {
+    die("Prepare failed: " . $conn->error);
+}
+
+
+
+$save->bind_param(
+
+"iiddiiidsss",
+
+$product_id,
+
+$save_branch,
+
+$daily,
+
+$days_left,
+
+$recommended,
+
+$clicks,
+
+$impressions,
+
+$position,
+
+$seoScore,
+
+$demand,
+
+$recommendation
+
+);
+
+if(!$save->execute()){
+    die("Execute failed: ".$save->error);
+}
+
+echo "Inserted Product ID: ".$product_id."<br>";
+
+$s->close();
+$seo->close();
+$save->close();
+}
+
+echo "AI Engine Updated Successfully";

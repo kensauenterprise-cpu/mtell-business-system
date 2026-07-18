@@ -1,0 +1,339 @@
+<?php
+
+require_once $_SERVER['DOCUMENT_ROOT'].'/infinity/admin/includes/init.php';
+
+$branch_id = $_SESSION['branch_id'] ?? 1;
+
+if($branch_id=="all"){
+
+$sql="
+
+SELECT
+
+p.name,
+
+p.stock,
+
+a.*
+
+FROM ai_predictions a
+
+JOIN products p
+ON p.id=a.product_id
+
+ORDER BY
+a.days_to_stockout ASC,
+a.search_clicks DESC
+
+LIMIT 100
+
+";
+
+$data=$conn->query($sql);
+
+}else{
+
+$sql="
+
+SELECT
+
+p.name,
+
+p.stock,
+
+a.*
+
+FROM ai_predictions a
+
+JOIN products p
+ON p.id=a.product_id
+
+WHERE a.branch_id=?
+
+ORDER BY
+a.days_to_stockout ASC,
+a.search_clicks DESC
+
+LIMIT 100
+
+";
+
+$stmt=$conn->prepare($sql);
+
+$stmt->bind_param("i",$branch_id);
+
+$stmt->execute();
+
+$data=$stmt->get_result();
+
+}
+
+?>
+
+<style>
+
+.ai-table{
+
+width:100%;
+
+border-collapse:collapse;
+
+font-family:Arial;
+
+background:#fff;
+
+}
+
+.ai-table th{
+
+background:#1e40af;
+
+color:#fff;
+
+padding:12px;
+
+text-align:center;
+
+}
+
+.ai-table td{
+
+padding:10px;
+
+border:1px solid #ddd;
+
+}
+
+.good{
+
+color:green;
+
+font-weight:bold;
+
+}
+
+.warning{
+
+color:#f59e0b;
+
+font-weight:bold;
+
+}
+
+.bad{
+
+color:red;
+
+font-weight:bold;
+
+}
+
+.card{
+
+background:white;
+
+padding:20px;
+
+border-radius:10px;
+
+margin-bottom:20px;
+
+box-shadow:0 2px 8px rgba(0,0,0,.08);
+
+}
+
+</style>
+
+<div class="card">
+
+<h2>🧠 AI Sales & SEO Prediction Dashboard</h2>
+
+</div>
+
+<table class="ai-table">
+
+<tr>
+
+<th>Product</th>
+
+<th>Stock</th>
+
+<th>Daily Sales</th>
+
+<th>Days Left</th>
+
+<th>Restock</th>
+
+<th>Clicks</th>
+
+<th>Impressions</th>
+
+<th>Position</th>
+
+<th>SEO</th>
+
+<th>Demand</th>
+
+<th>Recommendation</th>
+
+</tr>
+
+<?php while($row=$data->fetch_assoc()): ?>
+
+<tr>
+
+<td>
+
+<?=htmlspecialchars($row['name'])?>
+
+</td>
+
+<td>
+
+<?=$row['stock']?>
+
+</td>
+
+<td>
+
+<?=round($row['predicted_daily_sales'],2)?>
+
+</td>
+
+<td>
+
+<?php
+
+if($row['days_to_stockout']<=7){
+
+echo "<span class='bad'>".$row['days_to_stockout']."</span>";
+
+}elseif($row['days_to_stockout']<=30){
+
+echo "<span class='warning'>".$row['days_to_stockout']."</span>";
+
+}else{
+
+echo "<span class='good'>".$row['days_to_stockout']."</span>";
+
+}
+
+?>
+
+</td>
+
+<td>
+
+<?php
+
+if($row['recommended_restock']>0){
+
+echo "<span class='bad'>Order ".$row['recommended_restock']."</span>";
+
+}else{
+
+echo "<span class='good'>OK</span>";
+
+}
+
+?>
+
+</td>
+
+<td>
+
+<?=$row['search_clicks']?>
+
+</td>
+
+<td>
+
+<?=$row['search_impressions']?>
+
+</td>
+
+<td>
+
+<?=round($row['average_position'],1)?>
+
+</td>
+
+<td>
+
+<?php
+
+switch($row['seo_score']){
+
+case "Excellent":
+
+echo "<span class='good'>Excellent</span>";
+
+break;
+
+case "Good":
+
+echo "<span style='color:#2563eb;font-weight:bold;'>Good</span>";
+
+break;
+
+case "Average":
+
+echo "<span class='warning'>Average</span>";
+
+break;
+
+default:
+
+echo "<span class='bad'>Poor</span>";
+
+}
+
+?>
+
+</td>
+
+<td>
+
+<?php
+
+switch($row['demand_level']){
+
+case "Very High":
+
+echo "<span class='bad'>Very High</span>";
+
+break;
+
+case "High":
+
+echo "<span class='warning'>High</span>";
+
+break;
+
+case "Medium":
+
+echo "<span style='color:#2563eb;font-weight:bold;'>Medium</span>";
+
+break;
+
+default:
+
+echo "<span class='good'>Low</span>";
+
+}
+
+?>
+
+</td>
+
+<td>
+
+<?=htmlspecialchars($row['ai_recommendation'])?>
+
+</td>
+
+</tr>
+
+<?php endwhile; ?>
+
+</table>
